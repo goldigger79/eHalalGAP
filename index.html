@@ -1,0 +1,693 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from 'firebase/auth';
+import { getFirestore, doc, onSnapshot, setDoc, setLogLevel, getDoc } from 'firebase/firestore';
+
+// HaCeRa - Single-file React prototype
+// - Uses Tailwind CSS classes (assumes Tailwind is configured in the host project)
+// - Uses recharts for simple visualizations (please install 'recharts')
+// - This is a single-file component meant as a working prototype to preview UI and flows
+// - Now includes Firebase for user authentication and data persistence
+// - Features a login page to switch between client and consultant roles
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyAiIniIt-7Kk1tB9F20l7qXLwAmKF07DSU",
+  authDomain: "hecera-app.firebaseapp.com",
+  projectId: "hecera-app",
+  storageBucket: "hecera-app.firebasestorage.app",
+  messagingSenderId: "951898649821",
+  appId: "1:951898649821:web:48eeeea0c51144963a9734",
+  measurementId: "G-D3X4N3MKDD"
+};
+
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+// Initialize Firebase App, Auth, and Firestore instances once
+let app, auth, db;
+try {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+  setLogLevel('debug');
+} catch (e) {
+  console.error("Firebase initialization failed:", e);
+}
+
+
+const SAMPLE_CHECKLIST = [
+  // Documentation Requirements
+  { id: 1, category: 'Documentation', title: 'Company registration certificate (SSM)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/ssm.pdf', comment: '' },
+  { id: 2, category: 'Documentation', title: 'Business/manufacturing license', required: true, done: false, sampleLink: 'https://example.com/sample-docs/license.pdf', comment: '' },
+  { id: 3, category: 'Documentation', title: 'List of all products/services', required: true, done: false, sampleLink: 'https://example.com/sample-docs/products.pdf', comment: '' },
+  { id: 4, category: 'Documentation', title: 'Complete list of all ingredients', required: true, done: false, sampleLink: 'https://example.com/sample-docs/ingredients.pdf', comment: '' },
+  { id: 5, category: 'Documentation', title: 'Halal certificates for all ingredients', required: true, done: false, sampleLink: 'https://example.com/sample-docs/halal-certs.pdf', comment: '' },
+  { id: 6, category: 'Documentation', title: 'Ingredient specification sheets', required: false, done: false, sampleLink: 'https://example.com/sample-docs/specs.pdf', comment: '' },
+  { id: 7, category: 'Documentation', title: 'Process flow chart for each product', required: true, done: false, sampleLink: 'https://example.com/sample-docs/flow-chart.pdf', comment: '' },
+  { id: 8, category: 'Documentation', title: 'Factory layout plan and location map', required: true, done: false, sampleLink: 'https://example.com/sample-docs/layout.pdf', comment: '' },
+  { id: 9, category: 'Documentation', title: 'Photos of the manufacturing site', required: true, done: false, sampleLink: 'https://example.com/sample-docs/photos.pdf', comment: '' },
+  { id: 10, category: 'Documentation', title: 'Product packaging artwork and labels', required: true, done: false, sampleLink: 'https://example.com/sample-docs/labels.pdf', comment: '' },
+  { id: 11, category: 'Documentation', title: 'Other quality assurance certifications (HACCP, ISO, etc.)', required: false, done: false, sampleLink: 'https://example.com/sample-docs/certs.pdf', comment: '' },
+  { id: 12, category: 'Documentation', title: 'Proof of financial viability (annual turnover)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/turnover.pdf', comment: '' },
+  // Operational and Physical Requirements
+  { id: 13, category: 'Operational', title: 'Separate Halal product processing', required: true, done: false, sampleLink: 'https://example.com/sample-docs/segregation-plan.pdf', comment: '' },
+  { id: 14, category: 'Operational', title: 'Equipment sanitation procedures', required: true, done: false, sampleLink: 'https://example.com/sample-docs/sanitation-sop.pdf', comment: '' },
+  { id: 15, category: 'Operational', title: 'Premise hygiene and sanitation (GMP/GHP)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/hygiene-plan.pdf', comment: '' },
+  { id: 16, category: 'Operational', title: 'Business has been operational for at least 3 months', required: true, done: false, sampleLink: 'https://example.com/sample-docs/3-months-operation.pdf', comment: '' },
+  // Human Resources and Management Requirements
+  { id: 17, category: 'Personnel', title: 'At least two full-time Muslim workers', required: true, done: false, sampleLink: 'https://example.com/sample-docs/employee-records.pdf', comment: '' },
+  { id: 18, category: 'Personnel', title: 'Certified Halal Executive (if applicable)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/halal-exec-cert.pdf', comment: '' },
+  { id: 19, category: 'Personnel', title: 'Halal Assurance System Manual', required: true, done: false, sampleLink: 'https://example.com/sample-docs/has-manual.pdf', comment: '' },
+  { id: 20, category: 'Personnel', title: 'Staff training on Halal principles', required: true, done: false, sampleLink: 'https://example.com/sample-docs/training-records.pdf', comment: '' }
+];
+
+export default function HaCeRaApp() {
+  const [page, setPage] = useState('login');
+  const [checklist, setChecklist] = useState(SAMPLE_CHECKLIST);
+  const [clientData, setClientData] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [modal, setModal] = useState(null);
+  const [isConsultant, setIsConsultant] = useState(false);
+  const [clients, setClients] = useState(sampleClients());
+  const [selectedClientId, setSelectedClientId] = useState(null);
+
+  // Auth state listener
+  useEffect(() => {
+    if (!auth) return;
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setUserId(user.uid);
+        setIsAuthReady(true);
+        // If client, ensure their profile document exists
+        if (!isConsultant) {
+          const clientDocRef = doc(db, 'artifacts', appId, 'users', user.uid, 'clientData', 'profile');
+          const docSnap = await getDoc(clientDocRef);
+          if (!docSnap.exists()) {
+            await setDoc(clientDocRef, {
+              profile: {
+                companyName: '',
+                companyType: '',
+                contactName: '',
+                contactEmail: '',
+                contactPhone: ''
+              },
+              assessment: SAMPLE_CHECKLIST,
+              progress: 0,
+              updated: new Date().toLocaleString()
+            });
+          }
+        }
+      } else {
+        setUserId(null);
+        setIsAuthReady(false);
+        setClientData(null);
+        setChecklist(SAMPLE_CHECKLIST);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Firestore data listener
+  useEffect(() => {
+    if (!db || !userId || !isAuthReady || isConsultant) return;
+    const clientDocRef = doc(db, 'artifacts', appId, 'users', userId, 'clientData', 'profile');
+    const unsubscribe = onSnapshot(clientDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setClientData(data);
+        setChecklist(data.assessment);
+      } else {
+        setClientData(null);
+        setChecklist(SAMPLE_CHECKLIST);
+      }
+    }, (error) => {
+      console.error("Firestore onSnapshot listener error:", error);
+    });
+    return () => unsubscribe();
+  }, [db, userId, isAuthReady, isConsultant]);
+
+  const progress = useMemo(() => {
+    if (!checklist) return { total: 0, done: 0, percent: 0 };
+    const total = checklist.length;
+    const done = checklist.filter(i => i.done).length;
+    return { total, done, percent: Math.round((done / total) * 100) };
+  }, [checklist]);
+
+  const saveAssessment = async (newChecklist) => {
+    if (!userId || !isAuthReady || !db) return;
+    try {
+      const clientDocRef = doc(db, 'artifacts', appId, 'users', userId, 'clientData', 'profile');
+      await setDoc(clientDocRef, {
+        assessment: newChecklist,
+        progress: Math.round((newChecklist.filter(x => x.done).length / newChecklist.length) * 100),
+        updated: new Date().toLocaleString()
+      }, { merge: true });
+    } catch (e) {
+      console.error("Error saving assessment:", e);
+    }
+  };
+  
+  const saveProfile = async (newProfile) => {
+    if (!userId || !isAuthReady || !db) return;
+    try {
+      const clientDocRef = doc(db, 'artifacts', appId, 'users', userId, 'clientData', 'profile');
+      await setDoc(clientDocRef, {
+        profile: newProfile,
+        updated: new Date().toLocaleString()
+      }, { merge: true });
+      setModal({
+        title: 'Profile Saved',
+        message: 'Your company profile has been successfully saved.'
+      });
+    } catch (e) {
+      console.error("Error saving profile:", e);
+    }
+  };
+
+  const updateClientProgress = (clientId, updates) => {
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, ...updates } : c));
+  };
+
+  const markAllForClient = (clientId) => {
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, assessment: checklist.map(i => ({...i})) } : c));
+    setModal({
+      title: 'Assessment Saved',
+      message: 'The current checklist has been copied to the selected client\'s profile.'
+    });
+  };
+
+  // Logic to handle the login and logout from the pages
+  const handleClientLogin = async () => {
+    try {
+      await signInAnonymously(auth);
+      setPage('home');
+      setIsConsultant(false);
+    } catch (e) {
+      console.error("Client login failed:", e);
+    }
+  };
+
+  const handleConsultantLogin = async () => {
+    try {
+      await signInAnonymously(auth);
+      setPage('home');
+      setIsConsultant(true);
+    } catch (e) {
+      console.error("Consultant login failed:", e);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      if (auth) {
+        await signOut(auth);
+      }
+      setPage('login');
+      setIsConsultant(false);
+    } catch (e) {
+      console.error("Logout failed:", e);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-100 font-sans antialiased text-slate-800 flex flex-col items-center p-6">
+      {/* Main Content */}
+      <main className="max-w-7xl w-full mx-auto">
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex-grow"></div>
+          {page !== 'login' && (
+            <div className="flex items-center space-x-2">
+              <NavButton active={page === 'home'} onClick={() => setPage('home')}>Home</NavButton>
+              {!isConsultant && (
+                <>
+                  <NavButton active={page === 'checklist'} onClick={() => setPage('checklist')}>Checklist</NavButton>
+                  <NavButton active={page === 'profile'} onClick={() => setPage('profile')}>My Profile</NavButton>
+                </>
+              )}
+              {isConsultant && (
+                <>
+                  <NavButton active={page === 'consultant'} onClick={() => setPage('consultant')}>Dashboard</NavButton>
+                  {selectedClientId && <NavButton active={page === 'client'} onClick={() => setPage('client')}>Client Profile</NavButton>}
+                </>
+              )}
+              <button onClick={handleLogout} className="px-4 py-2 rounded-lg bg-rose-600 text-white font-medium hover:bg-rose-700 transition-colors duration-200">
+                Log Out
+              </button>
+            </div>
+          )}
+        </div>
+        
+        {page === 'login' && <LoginPage onClientLogin={handleClientLogin} onConsultantLogin={handleConsultantLogin} />}
+
+        {isAuthReady && page !== 'login' && (
+          <>
+            {isConsultant ? (
+              // Consultant Pages
+              <>
+                {page === 'home' && <Home progress={progress} onStart={() => setPage('consultant')} />}
+                {page === 'consultant' && <ConsultantPage clients={clients} onSelect={(id) => { setSelectedClientId(id); setPage('client'); }} updateClientProgress={updateClientProgress} />}
+                {page === 'client' && selectedClientId && <ClientProfile client={clients.find(c => c.id === selectedClientId)} saveAssessment={(updates) => updateClientProgress(selectedClientId, updates)} setModal={setModal} />}
+              </>
+            ) : (
+              // Client Pages
+              <>
+                {page === 'home' && <Home progress={progress} onStart={() => setPage('checklist')} />}
+                {page === 'checklist' && <ChecklistPage checklist={checklist} saveAssessment={saveAssessment} progress={progress} setModal={setModal} />}
+                {page === 'profile' && <MyProfilePage clientProfile={clientData?.profile || {}} saveProfile={saveProfile} />}
+              </>
+            )}
+          </>
+        )}
+      </main>
+
+      <footer className="mt-12 text-xs text-slate-500 text-center">
+        Copyright by ACE UniKL MICET 2025
+      </footer>
+
+      {modal && <Modal title={modal.title} message={modal.message} onClose={() => setModal(null)} />}
+    </div>
+  );
+}
+
+function NavButton({ children, active, onClick }){
+  return (
+    <button onClick={onClick} className={`px-4 py-2 rounded-lg font-medium transition-colors duration-200 ${active ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 hover:bg-slate-200'}`}>
+      {children}
+    </button>
+  );
+}
+
+function LoginPage({ onClientLogin, onConsultantLogin }) {
+  return (
+    <div className="flex flex-col items-center justify-center p-8 bg-white rounded-3xl shadow-2xl max-w-lg mx-auto mt-20">
+      <div className="flex flex-col items-center justify-center gap-4 mb-6 text-center">
+        <div className="font-extrabold text-5xl">HaCeRa</div>
+        <div className="text-sm text-slate-500">Halal Certificate Readiness Assessment</div>
+      </div>
+      <h2 className="text-4xl font-extrabold text-center text-slate-800">Welcome</h2>
+      <p className="mt-2 text-center text-slate-600">Please select your role to continue to the Halal Certificate Readiness Assessment.</p>
+      <div className="mt-8 w-full space-y-4">
+        <button
+          onClick={onClientLogin}
+          className="w-full py-4 px-6 bg-indigo-600 text-white rounded-full font-semibold shadow-lg hover:bg-indigo-700 transition-colors transform hover:scale-105"
+        >
+          Log in as Client
+        </button>
+        <button
+          onClick={onConsultantLogin}
+          className="w-full py-4 px-6 border border-slate-300 text-slate-800 rounded-full font-semibold hover:bg-slate-100 transition-colors transform hover:scale-105"
+        >
+          Log in as Consultant
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Home({ progress, onStart, isConsultant }){
+  const text = isConsultant 
+    ? "Business owners often find the Halal certification process to be complex and heavy on documentation. HaCeRa is designed to automate readiness checks, provide clear progress visualization, and give a powerful dashboard to track progress efficiently."
+    : "Navigating the Halal certification process can be complex. HaCeRa simplifies this by helping you track your readiness, visualize your progress, and manage all your documentation in one place. Your consultant can also view your progress, making collaboration easier than ever.";
+  
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="md:col-span-2 bg-white p-8 rounded-3xl shadow-xl">
+        <h2 className="text-2xl font-semibold text-slate-800">Why HaCeRa?</h2>
+        <p className="mt-4 text-slate-600">{text}</p>
+        <div className="mt-8 flex gap-4">
+          <button onClick={onStart} className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">Start Checklist</button>
+          <a className="px-6 py-3 border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-100 transition-colors duration-200" href="#sample-links">Sample documents</a>
+        </div>
+        <section className="mt-8" id="sample-links">
+          <h3 className="font-semibold text-lg">Sample documents</h3>
+          <ul className="mt-3 text-sm text-slate-600 list-disc list-inside space-y-1">
+            <li><a className="underline text-indigo-500 hover:text-indigo-600" href="https://example.com/sample-docs/registration.pdf" target="_blank" rel="noreferrer">Company Registration & Business License (sample)</a></li>
+            <li><a className="underline text-indigo-500 hover:text-indigo-600" href="https://example.com/sample-docs/ingredients.pdf" target="_blank" rel="noreferrer">Ingredient Specifications (sample)</a></li>
+            <li><a className="underline text-indigo-500 hover:text-indigo-600" href="https://example.com/sample-docs/sop.pdf" target="_blank" rel="noreferrer">SOP for Halal Handling (sample)</a></li>
+          </ul>
+        </section>
+      </div>
+      <div className="bg-white p-8 rounded-3xl shadow-xl flex flex-col justify-between">
+        <div>
+          <h3 className="font-semibold text-lg">Current readiness</h3>
+          <div className="mt-4">
+            <div className="text-sm text-slate-500">Completed</div>
+            <div className="mt-1 text-4xl font-bold">{progress.done}/{progress.total}</div>
+            <div className="mt-6">
+              <ProgressBar percent={progress.percent} />
+            </div>
+          </div>
+        </div>
+        <div className="mt-8">
+          <h4 className="font-semibold text-lg text-slate-700">Quick Tips</h4>
+          <ul className="mt-2 text-xs text-slate-600 list-disc list-inside space-y-1">
+            <li>Collect supplier declarations early.</li>
+            <li>Keep scanned copies of SOPs and training records.</li>
+            <li>Use HaCeRa to track progress and generate reports for your consultant.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProgressBar({ percent }) {
+  return (
+    <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+      <div style={{ width: `${percent}%` }} className="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all duration-500 ease-out"></div>
+    </div>
+  );
+}
+
+function ChecklistPage({ checklist, saveAssessment, progress, setModal }) {
+  const toggleDone = (id) => {
+    const updated = checklist.map(it => it.id === id ? { ...it, done: !it.done } : it);
+    saveAssessment(updated);
+  };
+
+  const handleUpload = (id) => {
+    const updated = checklist.map(it => it.id === id ? { ...it, done: true } : it);
+    saveAssessment(updated);
+    setModal({
+      title: 'Upload Successful',
+      message: 'The file has been successfully uploaded and the item is marked as complete. Your consultant will be able to view it shortly.'
+    });
+  };
+
+  const byCategory = checklist.reduce((acc, it) => {
+    acc[it.category] = acc[it.category] || [];
+    acc[it.category].push(it);
+    return acc;
+  }, {});
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="lg:col-span-2 bg-white p-8 rounded-3xl shadow-xl">
+        <h2 className="text-2xl font-semibold">Halal Certificate Checklist</h2>
+        <p className="mt-2 text-slate-500">Tick the items you have prepared or upload the required documents. Use sample links as references.</p>
+        <div className="mt-6 space-y-6">
+          {Object.keys(byCategory).map(cat => (
+            <div key={cat} className="p-5 border border-slate-200 rounded-2xl bg-slate-50/50">
+              <h3 className="font-semibold text-lg text-indigo-700">{cat}</h3>
+              <div className="mt-3 grid gap-4">
+                {byCategory[cat].map(item => (
+                  <div key={item.id} className="flex items-start justify-between bg-white p-4 rounded-xl shadow-sm transition-all duration-200 hover:shadow-md">
+                    <div className="flex items-start gap-4">
+                      <input checked={item.done} onChange={() => toggleDone(item.id)} id={`cb-${item.id}`} type="checkbox" className="mt-1 h-5 w-5 rounded-md text-indigo-600 focus:ring-indigo-500 border-slate-300 transition-colors duration-200" />
+                      <div className="flex-1">
+                        <label htmlFor={`cb-${item.id}`} className="font-medium text-slate-800 cursor-pointer">{item.title}</label>
+                        <div className="text-sm text-slate-500 mt-1">
+                          {item.required ? 'Required' : 'Optional'}
+                          <span className="mx-1">•</span>
+                          <a className="underline text-indigo-500 hover:text-indigo-600" href={item.sampleLink} target="_blank" rel="noreferrer">Sample</a>
+                        </div>
+                        {item.comment && (
+                          <div className="mt-3 p-3 rounded-lg bg-indigo-50 text-sm text-slate-700 border border-indigo-100">
+                            <span className="font-semibold text-indigo-800">Consultant Comment:</span> {item.comment}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {item.done ? (
+                      <div className="text-sm text-green-600 flex-shrink-0 flex items-center gap-1 font-medium">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+                        </svg>
+                        Completed
+                      </div>
+                    ) : (
+                      <button onClick={() => handleUpload(item.id)} className="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600 transition-colors duration-200 transform hover:scale-105">
+                        Upload File
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-8 flex gap-4">
+          <button className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">Export as PDF</button>
+        </div>
+      </div>
+      <aside className="bg-white p-8 rounded-3xl shadow-xl flex flex-col items-center">
+        <h3 className="font-semibold text-lg">Readiness summary</h3>
+        <div className="mt-6 w-full flex-1">
+          <div className="text-sm text-slate-500">Progress</div>
+          <div className="mt-1 text-4xl font-bold text-center">{progress.percent}%</div>
+          <div className="w-44 h-44 mt-6 mx-auto">
+            <ResponsiveContainer width="100%" height={160}>
+              <PieChart>
+                <Pie data={[{ name: 'Done', value: progress.done }, { name: 'Remaining', value: progress.total - progress.done }]} innerRadius={40} outerRadius={60} dataKey="value">
+                  <Cell fill="#10B981" />
+                  <Cell fill="#E5E7EB" />
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <div className="mt-8 w-full">
+          <h4 className="font-semibold text-lg text-slate-700">Quick tips</h4>
+          <ul className="mt-2 text-xs text-slate-600 list-disc list-inside space-y-1">
+            <li>Collect supplier declarations early.</li>
+            <li>Keep scanned copies of SOPs and training records.</li>
+            <li>Use HaCeRa to track progress and generate reports for your consultant.</li>
+          </ul>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function MyProfilePage({ clientProfile, saveProfile }) {
+  const [formData, setFormData] = useState(clientProfile);
+
+  useEffect(() => {
+    if (clientProfile) {
+      setFormData(clientProfile);
+    }
+  }, [clientProfile]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="bg-white p-8 rounded-3xl shadow-xl">
+        <h2 className="text-2xl font-semibold">My Company Profile</h2>
+        <p className="mt-2 text-slate-500">Fill in your company details to help your consultant.</p>
+        <div className="mt-6 space-y-4">
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">Company Name</span>
+            <input type="text" name="companyName" value={formData.companyName || ''} onChange={handleChange} className="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 transition-colors duration-200" />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">Company Type</span>
+            <input type="text" name="companyType" value={formData.companyType || ''} onChange={handleChange} className="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 transition-colors duration-200" />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">Contact Person</span>
+            <input type="text" name="contactName" value={formData.contactName || ''} onChange={handleChange} className="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 transition-colors duration-200" />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">Contact Email</span>
+            <input type="email" name="contactEmail" value={formData.contactEmail || ''} onChange={handleChange} className="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 transition-colors duration-200" />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">Contact Phone</span>
+            <input type="tel" name="contactPhone" value={formData.contactPhone || ''} onChange={handleChange} className="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 transition-colors duration-200" />
+          </label>
+        </div>
+        <div className="mt-8">
+          <button onClick={() => saveProfile(formData)} className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200 transform hover:scale-105">Save Profile</button>
+        </div>
+      </div>
+      <div className="bg-white p-8 rounded-3xl shadow-xl">
+        <h3 className="text-2xl font-semibold">Profile Preview</h3>
+        <div className="mt-4 p-6 border border-slate-200 rounded-xl">
+          <div className="text-xl font-medium">{formData.companyName || 'Your Company Name'}</div>
+          <div className="text-sm text-slate-500">{formData.companyType || 'Company Type'}</div>
+          <div className="mt-6 text-sm text-slate-500 font-medium">Contact Person</div>
+          <div className="text-lg font-medium text-slate-800">{formData.contactName || 'N/A'}</div>
+          <div className="text-sm text-indigo-600 font-medium">{formData.contactEmail || 'N/A'}</div>
+          <div className="text-sm text-slate-600 font-medium">{formData.contactPhone || 'N/A'}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ClientProfile({ client, saveAssessment, setModal }) {
+  if (!client) return <div className="bg-white p-6 rounded-2xl shadow-xl">No client data loaded.</div>;
+
+  const handleCommentChange = (id, newComment) => {
+    const updated = client.assessment.map(a => a.id === id ? { ...a, comment: newComment } : a);
+    saveAssessment({ assessment: updated });
+  };
+
+  const toggleAssess = (id) => {
+    const updated = client.assessment.map(a => a.id === id ? { ...a, done: !a.done } : a);
+    saveAssessment({ assessment: updated });
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="lg:col-span-2 bg-white p-8 rounded-3xl shadow-xl">
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold">{client.name}</h2>
+            <div className="text-sm text-slate-500">{client.type} • {client.status}</div>
+          </div>
+          <div className="text-right">
+            <div className="text-sm text-slate-500">Progress</div>
+            <div className="text-4xl font-bold">{client.progress}%</div>
+          </div>
+        </div>
+        <div className="mt-6">
+          <h3 className="font-semibold text-lg">Assessment items</h3>
+          <div className="mt-4 space-y-4">
+            {client.assessment && client.assessment.map(it => (
+              <div key={it.id} className="p-5 border border-slate-200 rounded-2xl bg-slate-50/50">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-4">
+                    <input checked={it.done} onChange={() => toggleAssess(it.id)} type="checkbox" className="mt-1 h-5 w-5 rounded-md text-indigo-600 focus:ring-indigo-500 border-slate-300 transition-colors duration-200" />
+                    <div className="flex-1">
+                      <div className="font-medium text-slate-800">{it.title}</div>
+                      <div className="text-sm text-slate-500 mt-1">
+                        {it.category}
+                        <span className="mx-1">•</span>
+                        <a className="underline text-indigo-500 hover:text-indigo-600" href={it.sampleLink} target="_blank" rel="noreferrer">Sample</a>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-slate-400 font-medium flex-shrink-0">{it.required ? 'Required' : 'Optional'}</div>
+                </div>
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-slate-700">
+                    Consultant Comment:
+                    <textarea 
+                      value={it.comment || ''}
+                      onChange={(e) => handleCommentChange(it.id, e.target.value)}
+                      rows="2"
+                      className="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 transition-colors duration-200"
+                      placeholder="Add comments for the client..."
+                    ></textarea>
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="mt-8 flex gap-4">
+          <button onClick={() => setModal({ title: 'Report Generated', message: 'A readiness report has been successfully generated for this client.' })} className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">Generate report</button>
+          <button onClick={() => setModal({ title: 'Message Sent', message: 'A notification has been sent to the client via email.' })} className="px-6 py-3 border border-slate-300 rounded-lg font-medium hover:bg-slate-100 transition-colors duration-200">Message client</button>
+        </div>
+      </div>
+      <aside className="bg-white p-8 rounded-3xl shadow-xl">
+        <h3 className="font-semibold text-lg">Summary</h3>
+        <div className="mt-4">
+          <div className="text-sm text-slate-500">Last updated</div>
+          <div className="text-sm font-medium mt-1">{client.updated}</div>
+          <div className="mt-6">
+            <h4 className="font-semibold text-lg">Notes</h4>
+            <div className="mt-2 text-sm text-slate-600">{client.notes || 'No notes yet. Use this area to add consultant observations.'}</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function ConsultantPage({ clients, onSelect, updateClientProgress }){
+  return (
+    <div className="bg-white p-8 rounded-3xl shadow-xl">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-semibold">Consultant Dashboard</h2>
+        <div className="text-sm text-slate-500">Manage clients & assessments</div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left table-auto border-collapse">
+          <thead>
+            <tr className="text-xs font-semibold text-slate-500 uppercase border-b border-slate-200">
+              <th className="p-4">Client</th>
+              <th className="p-4">Type</th>
+              <th className="p-4">Status</th>
+              <th className="p-4">Progress</th>
+              <th className="p-4">Last update</th>
+              <th className="p-4">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {clients.map(c => (
+              <tr key={c.id} className="border-t border-slate-200 transition-all duration-200 hover:bg-slate-50">
+                <td className="p-4 font-medium text-slate-800">{c.name}</td>
+                <td className="p-4 text-sm text-slate-600">{c.type}</td>
+                <td className="p-4">{c.status}</td>
+                <td className="p-4 w-64">
+                  <div className="text-sm">{c.progress}%</div>
+                  <div className="w-full bg-slate-200 h-2 rounded-full mt-1"><div style={{ width: `${c.progress}%` }} className="h-full bg-gradient-to-r from-indigo-500 to-cyan-400"></div></div>
+                </td>
+                <td className="p-4 text-sm text-slate-500">{c.updated}</td>
+                <td className="p-4">
+                  <button onClick={() => onSelect(c.id)} className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-medium hover:bg-slate-100 transition-colors duration-200">Open</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-6 text-xs text-slate-500">Tip: Click a client to open their profile, review assessments, and generate a readiness report.</div>
+    </div>
+  );
+}
+
+function Modal({ title, message, onClose }) {
+  return (
+    <div className="fixed inset-0 bg-slate-900 bg-opacity-50 flex items-center justify-center p-4 z-50 transition-opacity duration-300">
+      <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full transform scale-100 transition-transform duration-300">
+        <div className="flex justify-between items-center">
+          <h3 className="text-2xl font-bold text-slate-800">{title}</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors duration-200">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <p className="mt-4 text-slate-600">{message}</p>
+        <div className="mt-8 text-right">
+          <button onClick={onClose} className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors duration-200">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function sampleClients(){
+  // Helper function to create a new client assessment based on the updated SAMPLE_CHECKLIST
+  const createAssessment = (doneItems, comments = {}) => {
+    return SAMPLE_CHECKLIST.map(item => ({
+      ...item,
+      done: doneItems.includes(item.id),
+      comment: comments[item.id] || ''
+    }));
+  };
+
+  const createProfile = (name, type, contactName, contactEmail, contactPhone) => ({
+    companyName: name,
+    companyType: type,
+    contactName: contactName,
+    contactEmail: contactEmail,
+    contactPhone: contactPhone
+  });
+
+  return [
+    { id: 'c1', name: 'SateKita Foods', type: 'Food Manufacturer', status: 'In progress', progress: 45, updated: '2025-09-10 10:24', contact: { name: 'Ali', phone: '+60 12-345 6789', email: 'ali@satekita.com' }, assessment: createAssessment([1, 3, 7, 10, 13, 17, 19, 20], { 1: 'Please provide a clearer copy of the registration.', 17: 'Confirm the two Muslim employees are full-time and Malaysian citizens.' }), profile: createProfile('SateKita Foods', 'Food Manufacturer', 'Ali', 'ali@satekita.com', '+60 12-345 6789') },
+    { id: 'c2', name: 'BakerMan Bakery', type: 'Food Premise', status: 'Ready for review', progress: 85, updated: '2025-09-12 09:10', contact: { name: 'Siti', phone: '+60 11-222 3333', email: 'siti@bakerman.my' }, assessment: createAssessment([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], { 18: 'Please provide the Halal Executive certification number for verification.' }), profile: createProfile('BakerMan Bakery', 'Food Premise', 'Siti', 'siti@bakerman.my', '+60 11-222 3333') },
+    { id: 'c3', name: 'SauceMaker SME', type: 'SME (Sauces)', status: 'Needs documents', progress: 25, updated: '2025-09-08 14:05', contact: { name: 'Rahman', phone: '+60 19-444 5555', email: 'rahman@saucemaker.my' }, assessment: createAssessment([1, 2, 4, 7, 12, 13], { 4: 'We need the full ingredient list, including processing aids.', 12: 'Financial documents are missing.' }), profile: createProfile('SauceMaker SME', 'SME (Sauces)', 'Rahman', 'rahman@saucemaker.my', '+60 19-444 5555') },
+  ]
+}
