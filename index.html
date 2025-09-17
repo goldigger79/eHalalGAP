@@ -68,7 +68,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged, signOut, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, onSnapshot, setDoc, getDoc, setLogLevel, collection, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     // Global state variables
@@ -83,12 +83,22 @@
     // Global Firebase instances
     let app, auth, db;
 
-    // Firebase configuration and initialization
-    const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+    // --- PASTE YOUR FIREBASE CONFIGURATION HERE ---
+    // You MUST replace this with your project's Firebase configuration.
+    // Get it from Firebase Console > Project settings.
+    const firebaseConfig = {
+      apiKey: "AIzaSyAiIniIt-7Kk1tB9F20l7qXLwAmKF07DSU",
+      authDomain: "hecera-app.firebaseapp.com",
+      projectId: "hecera-app",
+      storageBucket: "hecera-app.firebasestorage.app",
+      messagingSenderId: "951898649821",
+      appId: "1:951898649821:web:48eeeea0c51144963a9734",
+      measurementId: "G-D3X4N3MKDD"
+    };
+    const appId = firebaseConfig.projectId; // Or a custom ID if you prefer
 
-    if (Object.keys(firebaseConfig).length > 0) {
+    // Initialize Firebase App, Auth, and Firestore instances once
+    if (Object.keys(firebaseConfig).length > 0 && firebaseConfig.apiKey !== "YOUR_API_KEY") {
       try {
         app = initializeApp(firebaseConfig);
         auth = getAuth(app);
@@ -98,7 +108,7 @@
         console.error("Firebase initialization failed:", e);
       }
     } else {
-        console.error("Firebase configuration is missing.");
+        console.error("Firebase configuration is missing or invalid. Please update the firebaseConfig object in the code.");
     }
     
     const PUBLIC_DATA_PATH = `artifacts/${appId}/public/data/clients`;
@@ -328,7 +338,7 @@
                 <li>Use HaCeRa to track progress and generate reports for your consultant.</li>
               </ul>
             </div>
-          </div>
+          </aside>
         </div>
       `;
       document.getElementById('page-home').innerHTML = homePageHtml;
@@ -688,12 +698,16 @@
 
     // Event handlers
     async function handleLogin() {
-      if (initialAuthToken) {
-          await signInWithCustomToken(auth, initialAuthToken);
-      } else {
-          await signInAnonymously(auth);
+      try {
+        if (!auth) {
+          console.error("Firebase Auth is not initialized.");
+          return;
+        }
+        await signInAnonymously(auth);
+        setPage('home');
+      } catch (e) {
+        console.error("Login failed:", e);
       }
-      setPage('home');
     }
 
     async function handleLogout() {
