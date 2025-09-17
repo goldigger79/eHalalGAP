@@ -12,24 +12,24 @@
     }
   </style>
 </head>
-<body class="min-h-screen bg-slate-100 antialiased text-slate-800 flex flex-col items-center p-6">
+<body class="min-h-screen bg-slate-100 antialiased text-slate-800 flex flex-col items-center p-4 sm:p-6">
 
   <!-- Main Application Container -->
   <main id="app-container" class="max-w-7xl w-full mx-auto">
     <!-- Navigation (Visible after login) -->
     <div id="nav-bar" class="flex justify-between items-center mb-6 hidden">
       <div class="flex-grow"></div>
-      <div class="flex items-center space-x-2">
-        <button id="nav-home" class="nav-button px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200">Home</button>
+      <div class="flex items-center space-x-2 flex-wrap justify-end">
+        <button id="nav-home" class="nav-button px-2 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200">Home</button>
         <div id="client-nav-buttons" class="hidden flex items-center space-x-2">
-          <button id="nav-checklist" class="nav-button px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200">Checklist</button>
-          <button id="nav-profile" class="nav-button px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200">My Profile</button>
+          <button id="nav-checklist" class="nav-button px-2 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200">Checklist</button>
+          <button id="nav-profile" class="nav-button px-2 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200">My Profile</button>
         </div>
         <div id="consultant-nav-buttons" class="hidden flex items-center space-x-2">
-          <button id="nav-consultant-dashboard" class="nav-button px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200">Dashboard</button>
-          <button id="nav-consultant-client" class="nav-button px-4 py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200 hidden">Client Profile</button>
+          <button id="nav-consultant-dashboard" class="nav-button px-2 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200">Dashboard</button>
+          <button id="nav-consultant-client" class="nav-button px-2 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200 hidden">Client Profile</button>
         </div>
-        <button id="logout-button" class="px-4 py-2 rounded-lg bg-rose-600 text-white font-medium hover:bg-rose-700 transition-colors duration-200">
+        <button id="logout-button" class="px-2 py-1 sm:px-4 sm:py-2 rounded-lg bg-rose-600 text-white font-medium hover:bg-rose-700 transition-colors duration-200">
           Log Out
         </button>
       </div>
@@ -301,10 +301,10 @@
       
       const homePageHtml = `
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div class="md:col-span-2 bg-white p-8 rounded-3xl shadow-xl">
+          <div class="md:col-span-2 bg-white p-6 sm:p-8 rounded-3xl shadow-xl">
             <h2 class="text-2xl font-semibold text-slate-800">Why HaCeRa?</h2>
             <p class="mt-4 text-slate-600">${text}</p>
-            <div class="mt-8 flex gap-4">
+            <div class="mt-8 flex gap-4 flex-wrap">
               <button id="start-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">Start Checklist</button>
               <a class="px-6 py-3 border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-100 transition-colors duration-200" href="#sample-links">Sample documents</a>
             </div>
@@ -317,7 +317,7 @@
               </ul>
             </section>
           </div>
-          <div class="bg-white p-8 rounded-3xl shadow-xl flex flex-col justify-between">
+          <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-xl flex flex-col justify-between">
             <div>
               <h3 class="font-semibold text-lg">Current readiness</h3>
               <div class="mt-4">
@@ -338,7 +338,7 @@
                 <li>Use HaCeRa to track progress and generate reports for your consultant.</li>
               </ul>
             </div>
-          </aside>
+          </div>
         </div>
       `;
       document.getElementById('page-home').innerHTML = homePageHtml;
@@ -357,7 +357,7 @@
     
       const checklistHtml = `
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div class="lg:col-span-2 bg-white p-8 rounded-3xl shadow-xl">
+          <div class="lg:col-span-2 bg-white p-6 sm:p-8 rounded-3xl shadow-xl">
             <h2 class="text-2xl font-semibold">Halal Certificate Checklist</h2>
             <p class="mt-2 text-slate-500">Tick the items you have prepared or upload the required documents. Use sample links as references.</p>
             <div class="mt-6 space-y-6" id="checklist-items-container">
@@ -366,8 +366,8 @@
                   <h3 class="font-semibold text-lg text-indigo-700">${cat}</h3>
                   <div class="mt-3 grid gap-4">
                     ${byCategory[cat].map(item => `
-                      <div class="flex items-start justify-between bg-white p-4 rounded-xl shadow-sm transition-all duration-200 hover:shadow-md">
-                        <div class="flex items-start gap-4">
+                      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white p-4 rounded-xl shadow-sm transition-all duration-200 hover:shadow-md">
+                        <div class="flex items-start gap-4 flex-grow">
                           <input type="checkbox" id="cb-${item.id}" ${item.done ? 'checked' : ''} class="mt-1 h-5 w-5 rounded-md text-indigo-600 focus:ring-indigo-500 border-slate-300 toggle-checkbox" data-id="${item.id}" />
                           <div class="flex-1">
                             <label for="cb-${item.id}" class="font-medium text-slate-800 cursor-pointer">${item.title}</label>
@@ -383,8 +383,9 @@
                             ` : ''}
                           </div>
                         </div>
+                        <div class="mt-4 sm:mt-0 flex-shrink-0">
                         ${item.done ? `
-                          <div class="text-sm text-green-600 flex-shrink-0 flex items-center gap-1 font-medium">
+                          <div class="text-sm text-green-600 flex items-center gap-1 font-medium">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
                               <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
                             </svg>
@@ -395,6 +396,7 @@
                             Upload File
                           </button>
                         `}
+                        </div>
                       </div>
                     `).join('')}
                   </div>
@@ -405,12 +407,12 @@
               <button id="export-pdf-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">Export as PDF</button>
             </div>
           </div>
-          <aside class="bg-white p-8 rounded-3xl shadow-xl flex flex-col items-center">
+          <aside class="bg-white p-6 sm:p-8 rounded-3xl shadow-xl flex flex-col items-center">
             <h3 class="font-semibold text-lg">Readiness summary</h3>
             <div class="mt-6 w-full flex-1">
               <div class="text-sm text-slate-500">Progress</div>
               <div class="mt-1 text-4xl font-bold text-center">${progress.percent}%</div>
-              <div class="w-44 h-44 mt-6 mx-auto">
+              <div class="w-full max-w-[176px] h-44 mt-6 mx-auto">
                 <svg viewBox="0 0 100 100" class="w-full h-full">
                   <circle cx="50" cy="50" r="40" fill="none" stroke="#E5E7EB" stroke-width="20" />
                   <path d="M 50 10 A 40 40 0 ${progress.percent > 50 ? 1 : 0} 1 ${50 + 40 * Math.sin(2 * Math.PI * progress.percent / 100)} ${50 - 40 * Math.cos(2 * Math.PI * progress.percent / 100)}" fill="none" stroke="#10B981" stroke-width="20" stroke-linecap="round" />
@@ -441,7 +443,7 @@
       const profile = clientData?.profile || {};
       const profileHtml = `
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div class="bg-white p-8 rounded-3xl shadow-xl">
+          <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-xl">
             <h2 class="text-2xl font-semibold">My Company Profile</h2>
             <p class="mt-2 text-slate-500">Fill in your company details to help your consultant.</p>
             <div class="mt-6 space-y-4">
@@ -470,7 +472,7 @@
               <button id="save-profile-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200 transform hover:scale-105">Save Profile</button>
             </div>
           </div>
-          <div class="bg-white p-8 rounded-3xl shadow-xl">
+          <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-xl">
             <h3 class="text-2xl font-semibold">Profile Preview</h3>
             <div class="mt-4 p-6 border border-slate-200 rounded-xl">
               <div id="preview-companyName" class="text-xl font-medium">${profile.companyName || 'Your Company Name'}</div>
@@ -523,8 +525,8 @@
         </tr>
       `).join('');
       const consultantHtml = `
-        <div class="bg-white p-8 rounded-3xl shadow-xl">
-          <div class="flex justify-between items-center mb-6">
+        <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-xl">
+          <div class="flex justify-between items-center mb-6 flex-wrap gap-2">
             <h2 class="text-2xl font-semibold">Consultant Dashboard</h2>
             <div class="text-sm text-slate-500">Manage clients & assessments</div>
           </div>
@@ -563,8 +565,8 @@
 
       const assessmentHtml = client.assessment.map(it => `
         <div class="p-5 border border-slate-200 rounded-2xl bg-slate-50/50">
-          <div class="flex items-start justify-between">
-            <div class="flex items-start gap-4">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between">
+            <div class="flex items-start gap-4 flex-grow">
               <input type="checkbox" id="consultant-cb-${it.id}" ${it.done ? 'checked' : ''} class="mt-1 h-5 w-5 rounded-md text-indigo-600 focus:ring-indigo-500 border-slate-300 consultant-toggle-checkbox" data-id="${it.id}" />
               <div class="flex-1">
                 <label for="consultant-cb-${it.id}" class="font-medium text-slate-800">${it.title}</label>
@@ -575,7 +577,7 @@
                 </div>
               </div>
             </div>
-            <div class="text-xs text-slate-400 font-medium flex-shrink-0">${it.required ? 'Required' : 'Optional'}</div>
+            <div class="mt-2 sm:mt-0 text-xs text-slate-400 font-medium flex-shrink-0">${it.required ? 'Required' : 'Optional'}</div>
           </div>
           <div class="mt-4">
             <label class="block text-sm font-medium text-slate-700">
@@ -594,13 +596,13 @@
 
       const clientProfileHtml = `
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div class="lg:col-span-2 bg-white p-8 rounded-3xl shadow-xl">
-            <div class="flex items-start justify-between">
+          <div class="lg:col-span-2 bg-white p-6 sm:p-8 rounded-3xl shadow-xl">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between">
               <div>
                 <h2 class="text-2xl font-semibold">${client.name}</h2>
                 <div class="text-sm text-slate-500">${client.type} • ${client.status}</div>
               </div>
-              <div class="text-right">
+              <div class="text-right mt-4 sm:mt-0">
                 <div class="text-sm text-slate-500">Progress</div>
                 <div class="text-4xl font-bold">${client.progress}%</div>
               </div>
@@ -611,12 +613,12 @@
                 ${assessmentHtml}
               </div>
             </div>
-            <div class="mt-8 flex gap-4">
+            <div class="mt-8 flex gap-4 flex-wrap">
               <button id="generate-report-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">Generate report</button>
               <button id="message-client-btn" class="px-6 py-3 border border-slate-300 rounded-lg font-medium hover:bg-slate-100 transition-colors duration-200">Message client</button>
             </div>
           </div>
-          <aside class="bg-white p-8 rounded-3xl shadow-xl">
+          <aside class="bg-white p-6 sm:p-8 rounded-3xl shadow-xl">
             <h3 class="font-semibold text-lg">Summary</h3>
             <div class="mt-4">
               <div class="text-sm text-slate-500">Last updated</div>
