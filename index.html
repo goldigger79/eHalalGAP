@@ -36,12 +36,13 @@
     </div>
 
     <!-- Page Containers -->
-    <div id="page-login"></div>
-    <div id="page-home" class="hidden"></div>
-    <div id="page-checklist" class="hidden"></div>
-    <div id="page-profile" class="hidden"></div>
-    <div id="page-consultant-dashboard" class="hidden"></div>
-    <div id="page-consultant-client" class="hidden"></div>
+    <div id="page-landing" class="page-container"></div>
+    <div id="page-login" class="page-container hidden"></div>
+    <div id="page-home" class="page-container hidden"></div>
+    <div id="page-checklist" class="page-container hidden"></div>
+    <div id="page-profile" class="page-container hidden"></div>
+    <div id="page-consultant-dashboard" class="page-container hidden"></div>
+    <div id="page-consultant-client" class="page-container hidden"></div>
   </main>
 
   <footer class="mt-12 text-xs text-slate-500 text-center">
@@ -60,28 +61,38 @@
         </button>
       </div>
       <p id="modal-message" class="mt-4 text-slate-600"></p>
+      <div id="upload-progress-container" class="mt-4 hidden">
+        <div class="w-full bg-slate-200 rounded-full h-2.5">
+          <div id="upload-progress-bar" class="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+        <div class="text-right text-xs text-slate-500 mt-1"><span id="upload-progress-text">0%</span> uploaded</div>
+      </div>
       <div class="mt-8 text-right">
         <button id="modal-ok-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors duration-200">Close</button>
       </div>
     </div>
   </div>
-
+  
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, createUserWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, onSnapshot, setDoc, getDoc, setLogLevel, collection, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL, uploadBytesResumable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
     // Global state variables
-    let page = 'login';
+    let page = 'landing';
     let checklist = [];
     let clientData = null;
     let userId = null;
     let isConsultant = false;
     let selectedClientId = null;
     let clients = [];
+    let unsubscribeClientListener = null;
+    let unsubscribeConsultantListener = null;
+    let isAuthReady = false;
 
     // Global Firebase instances
-    let app, auth, db;
+    let app, auth, db, storage;
 
     // --- PASTE YOUR FIREBASE CONFIGURATION HERE ---
     // You MUST replace this with your project's Firebase configuration.
@@ -96,13 +107,14 @@
       measurementId: "G-D3X4N3MKDD"
     };
     const appId = firebaseConfig.projectId; // Or a custom ID if you prefer
-
+    
     // Initialize Firebase App, Auth, and Firestore instances once
     if (Object.keys(firebaseConfig).length > 0 && firebaseConfig.apiKey !== "YOUR_API_KEY") {
       try {
         app = initializeApp(firebaseConfig);
         auth = getAuth(app);
         db = getFirestore(app);
+        storage = getStorage(app);
         setLogLevel('debug');
       } catch (e) {
         console.error("Firebase initialization failed:", e);
@@ -113,149 +125,296 @@
     
     const PUBLIC_DATA_PATH = `artifacts/${appId}/public/data/clients`;
     const PRIVATE_DATA_PATH = (uid) => `artifacts/${appId}/users/${uid}/clientData`;
+    const USERS_COLLECTION = `users`;
 
     const SAMPLE_CHECKLIST = [
-      { id: 1, category: 'Documentation', title: 'Company registration certificate (SSM)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/ssm.pdf', comment: '' },
-      { id: 2, category: 'Documentation', title: 'Business/manufacturing license', required: true, done: false, sampleLink: 'https://example.com/sample-docs/license.pdf', comment: '' },
-      { id: 3, category: 'Documentation', title: 'List of all products/services', required: true, done: false, sampleLink: 'https://example.com/sample-docs/products.pdf', comment: '' },
-      { id: 4, category: 'Documentation', title: 'Complete list of all ingredients', required: true, done: false, sampleLink: 'https://example.com/sample-docs/ingredients.pdf', comment: '' },
-      { id: 5, category: 'Documentation', title: 'Halal certificates for all ingredients', required: true, done: false, sampleLink: 'https://example.com/sample-docs/halal-certs.pdf', comment: '' },
-      { id: 6, category: 'Documentation', title: 'Ingredient specification sheets', required: false, done: false, sampleLink: 'https://example.com/sample-docs/specs.pdf', comment: '' },
-      { id: 7, category: 'Documentation', title: 'Process flow chart for each product', required: true, done: false, sampleLink: 'https://example.com/sample-docs/flow-chart.pdf', comment: '' },
-      { id: 8, category: 'Documentation', title: 'Factory layout plan and location map', required: true, done: false, sampleLink: 'https://example.com/sample-docs/layout.pdf', comment: '' },
-      { id: 9, category: 'Documentation', title: 'Photos of the manufacturing site', required: true, done: false, sampleLink: 'https://example.com/sample-docs/photos.pdf', comment: '' },
-      { id: 10, category: 'Documentation', title: 'Product packaging artwork and labels', required: true, done: false, sampleLink: 'https://example.com/sample-docs/labels.pdf', comment: '' },
-      { id: 11, category: 'Documentation', title: 'Other quality assurance certifications (HACCP, ISO, etc.)', required: false, done: false, sampleLink: 'https://example.com/sample-docs/certs.pdf', comment: '' },
-      { id: 12, category: 'Documentation', title: 'Proof of financial viability (annual turnover)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/turnover.pdf', comment: '' },
-      { id: 13, category: 'Operational', title: 'Separate Halal product processing', required: true, done: false, sampleLink: 'https://example.com/sample-docs/segregation-plan.pdf', comment: '' },
-      { id: 14, category: 'Operational', title: 'Equipment sanitation procedures', required: true, done: false, sampleLink: 'https://example.com/sample-docs/sanitation-sop.pdf', comment: '' },
-      { id: 15, category: 'Operational', title: 'Premise hygiene and sanitation (GMP/GHP)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/hygiene-plan.pdf', comment: '' },
-      { id: 16, category: 'Operational', title: 'Business has been operational for at least 3 months', required: true, done: false, sampleLink: 'https://example.com/sample-docs/3-months-operation.pdf', comment: '' },
-      { id: 17, category: 'Personnel', title: 'At least two full-time Muslim workers', required: true, done: false, sampleLink: 'https://example.com/sample-docs/employee-records.pdf', comment: '' },
-      { id: 18, category: 'Personnel', title: 'Certified Halal Executive (if applicable)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/halal-exec-cert.pdf', comment: '' },
-      { id: 19, category: 'Personnel', title: 'Halal Assurance System Manual', required: true, done: false, sampleLink: 'https://example.com/sample-docs/has-manual.pdf', comment: '' },
-      { id: 20, category: 'Personnel', title: 'Staff training on Halal principles', required: true, done: false, sampleLink: 'https://example.com/sample-docs/training-records.pdf', comment: '' }
+      { id: 1, category: 'Documentation', title: 'Company registration certificate (SSM)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/ssm.pdf', comment: '', fileUrl: '' },
+      { id: 2, category: 'Documentation', title: 'Business/manufacturing license', required: true, done: false, sampleLink: 'https://example.com/sample-docs/license.pdf', comment: '', fileUrl: '' },
+      { id: 3, category: 'Documentation', title: 'List of all products/services', required: true, done: false, sampleLink: 'https://example.com/sample-docs/products.pdf', comment: '', fileUrl: '' },
+      { id: 4, category: 'Documentation', title: 'Complete list of all ingredients', required: true, done: false, sampleLink: 'https://example.com/sample-docs/ingredients.pdf', comment: '', fileUrl: '' },
+      { id: 5, category: 'Documentation', title: 'Halal certificates for all ingredients', required: true, done: false, sampleLink: 'https://example.com/sample-docs/halal-certs.pdf', comment: '', fileUrl: '' },
+      { id: 6, category: 'Documentation', title: 'Ingredient specification sheets', required: false, done: false, sampleLink: 'https://example.com/sample-docs/specs.pdf', comment: '', fileUrl: '' },
+      { id: 7, category: 'Documentation', title: 'Process flow chart for each product', required: true, done: false, sampleLink: 'https://example.com/sample-docs/flow-chart.pdf', comment: '', fileUrl: '' },
+      { id: 8, category: 'Documentation', title: 'Factory layout plan and location map', required: true, done: false, sampleLink: 'https://example.com/sample-docs/layout.pdf', comment: '', fileUrl: '' },
+      { id: 9, category: 'Documentation', title: 'Photos of the manufacturing site', required: true, done: false, sampleLink: 'https://example.com/sample-docs/photos.pdf', comment: '', fileUrl: '' },
+      { id: 10, category: 'Documentation', title: 'Product packaging artwork and labels', required: true, done: false, sampleLink: 'https://example.com/sample-docs/labels.pdf', comment: '', fileUrl: '' },
+      { id: 11, category: 'Documentation', title: 'Other quality assurance certifications (HACCP, ISO, etc.)', required: false, done: false, sampleLink: 'https://example.com/sample-docs/certs.pdf', comment: '', fileUrl: '' },
+      { id: 12, category: 'Documentation', title: 'Proof of financial viability (annual turnover)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/turnover.pdf', comment: '', fileUrl: '' },
+      { id: 13, category: 'Operational', title: 'Separate Halal product processing', required: true, done: false, sampleLink: 'https://example.com/sample-docs/segregation-plan.pdf', comment: '', fileUrl: '' },
+      { id: 14, category: 'Operational', title: 'Equipment sanitation procedures', required: true, done: false, sampleLink: 'https://example.com/sample-docs/sanitation-sop.pdf', comment: '', fileUrl: '' },
+      { id: 15, category: 'Operational', title: 'Premise hygiene and sanitation (GMP/GHP)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/hygiene-plan.pdf', comment: '', fileUrl: '' },
+      { id: 16, category: 'Operational', title: 'Business has been operational for at least 3 months', required: true, done: false, sampleLink: 'https://example.com/sample-docs/3-months-operation.pdf', comment: '', fileUrl: '' },
+      { id: 17, category: 'Personnel', title: 'At least two full-time Muslim workers', required: true, done: false, sampleLink: 'https://example.com/sample-docs/employee-records.pdf', comment: '', fileUrl: '' },
+      { id: 18, category: 'Personnel', title: 'Certified Halal Executive (if applicable)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/halal-exec-cert.pdf', comment: '', fileUrl: '' },
+      { id: 19, category: 'Personnel', title: 'Halal Assurance System Manual', required: true, done: false, sampleLink: 'https://example.com/sample-docs/has-manual.pdf', comment: '', fileUrl: '' },
+      { id: 20, category: 'Personnel', title: 'Staff training on Halal principles', required: true, done: false, sampleLink: 'https://example.com/sample-docs/training-records.pdf', comment: '', fileUrl: '' }
     ];
-
-    function createSampleClients() {
-      const createAssessment = (doneItems, comments = {}) => {
-        return SAMPLE_CHECKLIST.map(item => ({
-          ...item,
-          done: doneItems.includes(item.id),
-          comment: comments[item.id] || ''
-        }));
-      };
-      const createProfile = (name, type, contactName, contactEmail, contactPhone) => ({
-        companyName: name, type, contactName, contactEmail, contactPhone
-      });
-      return [
-        { id: 'c1', name: 'SateKita Foods', type: 'Food Manufacturer', status: 'In progress', progress: 45, updated: '2025-09-10 10:24', contact: { name: 'Ali', phone: '+60 12-345 6789', email: 'ali@satekita.com' }, assessment: createAssessment([1, 3, 7, 10, 13, 17, 19, 20], { 1: 'Please provide a clearer copy of the registration.', 17: 'Confirm the two Muslim employees are full-time and Malaysian citizens.' }), profile: createProfile('SateKita Foods', 'Food Manufacturer', 'Ali', 'ali@satekita.com', '+60 12-345 6789') },
-        { id: 'c2', name: 'BakerMan Bakery', type: 'Food Premise', status: 'Ready for review', progress: 85, updated: '2025-09-12 09:10', contact: { name: 'Siti', phone: '+60 11-222 3333', email: 'siti@bakerman.my' }, assessment: createAssessment([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], { 18: 'Please provide the Halal Executive certification number for verification.' }), profile: createProfile('BakerMan Bakery', 'Food Premise', 'Siti', 'siti@bakerman.my', '+60 11-222 3333') },
-        { id: 'c3', name: 'SauceMaker SME', type: 'SME (Sauces)', status: 'Needs documents', progress: 25, updated: '2025-09-08 14:05', contact: { name: 'Rahman', phone: '+60 19-444 5555', email: 'rahman@saucemaker.my' }, assessment: createAssessment([1, 2, 4, 7, 12, 13], { 4: 'We need the full ingredient list, including processing aids.', 12: 'Financial documents are missing.' }), profile: createProfile('SauceMaker SME', 'SME (Sauces)', 'Rahman', 'rahman@saucemaker.my', '+60 19-444 5555') },
-      ];
-    }
     
     // Auth state listener
     if(auth) {
         onAuthStateChanged(auth, async (user) => {
+            isAuthReady = true;
             if (user) {
                 userId = user.uid;
-                if (!isConsultant) {
-                    const clientDocRef = doc(db, PRIVATE_DATA_PATH(userId), 'profile');
-                    const docSnap = await getDoc(clientDocRef);
-                    if (!docSnap.exists()) {
-                        await setDoc(clientDocRef, {
-                            profile: { companyName: '', companyType: '', contactName: '', contactEmail: '', contactPhone: '' },
-                            assessment: SAMPLE_CHECKLIST,
-                            progress: 0,
-                            updated: new Date().toLocaleString()
+                try {
+                    const userDocRef = doc(db, USERS_COLLECTION, userId);
+                    const userDocSnap = await getDoc(userDocRef);
+                    if (userDocSnap.exists()) {
+                        const userRole = userDocSnap.data().role;
+                        isConsultant = (userRole === 'consultant');
+                    } else {
+                        await setDoc(userDocRef, {
+                            email: user.email,
+                            role: 'client'
+                        });
+                        isConsultant = false;
+                    }
+                    
+                    if (!isConsultant) {
+                        const clientDocRef = doc(db, PRIVATE_DATA_PATH(userId), 'profile');
+                        const publicDocRef = doc(db, PUBLIC_DATA_PATH, userId);
+                        const docSnap = await getDoc(clientDocRef);
+                        if (!docSnap.exists()) {
+                            await setDoc(clientDocRef, {
+                                profile: { companyName: '', companyType: '', contactName: '', contactEmail: '', contactPhone: '' },
+                                assessment: SAMPLE_CHECKLIST,
+                                progress: 0,
+                                updated: new Date().toLocaleString()
+                            });
+                            await setDoc(publicDocRef, {
+                              profile: { companyName: '', companyType: '', contactName: '', contactEmail: '', contactPhone: '' },
+                              assessment: SAMPLE_CHECKLIST,
+                              progress: 0,
+                              updated: new Date().toLocaleString()
+                            });
+                        }
+
+                        if (unsubscribeClientListener) unsubscribeClientListener();
+                        unsubscribeClientListener = onSnapshot(clientDocRef, (snap) => {
+                          if (snap.exists()) {
+                            clientData = snap.data();
+                            checklist = clientData.assessment;
+                            updateUI();
+                          }
+                        });
+                    } else {
+                        if (unsubscribeConsultantListener) unsubscribeConsultantListener();
+                        const publicClientsCollectionRef = collection(db, PUBLIC_DATA_PATH);
+                        unsubscribeConsultantListener = onSnapshot(publicClientsCollectionRef, (querySnapshot) => {
+                            clients = [];
+                            querySnapshot.forEach(docSnap => {
+                                const clientData = docSnap.data();
+                                clients.push({
+                                  id: docSnap.id,
+                                  name: clientData.profile?.companyName || `Client ${docSnap.id.substring(0, 5)}`,
+                                  type: clientData.profile?.companyType || 'N/A',
+                                  status: clientData.progress === 100 ? 'Ready' : 'In progress',
+                                  progress: clientData.progress || 0,
+                                  updated: clientData.updated || 'N/A',
+                                  assessment: clientData.assessment || []
+                                });
+                            });
+                            updateUI();
+                        }, (error) => {
+                          console.error("Error fetching client profiles:", error);
+                          // This error is handled by a permission check on the page render
                         });
                     }
-                    // Setup real-time listener for client data
-                    onSnapshot(clientDocRef, (snap) => {
-                      if (snap.exists()) {
-                        clientData = snap.data();
-                        checklist = clientData.assessment;
-                        renderPage(page);
-                      }
-                    });
+                    
+                } catch (e) {
+                    console.error("Auth state change error:", e);
+                    // Handle specific errors like "permission-denied"
                 }
-                renderPage(page);
+
+                updateUI();
             } else {
                 userId = null;
                 clientData = null;
                 checklist = SAMPLE_CHECKLIST;
-                renderPage('login');
+                selectedClientId = null;
+                if (unsubscribeClientListener) unsubscribeClientListener();
+                if (unsubscribeConsultantListener) unsubscribeConsultantListener();
+                updateUI();
             }
         });
     }
 
-    // Helper function to show/hide pages
-    function renderPage(pageName) {
-      page = pageName;
-      document.querySelectorAll('#app-container > div').forEach(el => el.classList.add('hidden'));
-      document.getElementById('nav-bar').classList.add('hidden');
-      document.getElementById('nav-consultant-client').classList.add('hidden');
-      document.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-md'));
+    // Centralized UI Update Function
+    function updateUI() {
+        if (!isAuthReady) {
+            renderPage('landing');
+            return;
+        }
 
-      if (page === 'login') {
-        document.getElementById('page-login').classList.remove('hidden');
-        renderLoginPage();
-      } else {
-        document.getElementById('nav-bar').classList.remove('hidden');
-        document.getElementById(`nav-${page.replace('consultant', 'consultant-dashboard').replace('client', 'consultant-client')}`).classList.add('bg-indigo-600', 'text-white', 'shadow-md');
-        
-        if (isConsultant) {
-          document.getElementById('client-nav-buttons').classList.add('hidden');
-          document.getElementById('consultant-nav-buttons').classList.remove('hidden');
-          if (selectedClientId) {
-            document.getElementById('nav-consultant-client').classList.remove('hidden');
+        const navBar = document.getElementById('nav-bar');
+        const clientNav = document.getElementById('client-nav-buttons');
+        const consultantNav = document.getElementById('consultant-nav-buttons');
+        const navClientProfile = document.getElementById('nav-consultant-client');
+
+        if (userId) {
+            navBar.classList.remove('hidden');
+            if (isConsultant) {
+                clientNav.classList.add('hidden');
+                consultantNav.classList.remove('hidden');
+                if (selectedClientId) navClientProfile.classList.remove('hidden');
+                else navClientProfile.classList.add('hidden');
+            } else {
+                clientNav.classList.remove('hidden');
+                consultantNav.classList.add('hidden');
+            }
+        } else {
+            navBar.classList.add('hidden');
+        }
+
+        renderPage(page);
+        attachNavEventListeners();
+    }
+
+    function attachNavEventListeners() {
+      document.getElementById('nav-home').addEventListener('click', () => {
+        renderPage('home');
+      });
+      document.getElementById('nav-checklist').addEventListener('click', () => {
+        renderPage('checklist');
+      });
+      document.getElementById('nav-profile').addEventListener('click', () => {
+        renderPage('profile');
+      });
+      document.getElementById('nav-consultant-dashboard').addEventListener('click', () => {
+        renderPage('consultant');
+      });
+      document.getElementById('nav-consultant-client').addEventListener('click', () => {
+        renderPage('client');
+      });
+    }
+
+    function renderPage(pageName) {
+        page = pageName;
+        document.querySelectorAll('.page-container').forEach(el => el.classList.add('hidden'));
+
+        if (userId && isConsultant) {
+          switch(pageName) {
+            case 'home':
+            case 'consultant':
+              document.getElementById('page-consultant-dashboard').classList.remove('hidden');
+              renderConsultantPage();
+              break;
+            case 'client':
+              document.getElementById('page-consultant-client').classList.remove('hidden');
+              renderClientProfilePage();
+              break;
+            default:
+              document.getElementById('page-consultant-dashboard').classList.remove('hidden');
+              renderConsultantPage();
+              break;
+          }
+        } else if (userId && !isConsultant) {
+          switch(pageName) {
+            case 'checklist':
+              document.getElementById('page-checklist').classList.remove('hidden');
+              renderChecklistPage();
+              break;
+            case 'profile':
+              document.getElementById('page-profile').classList.remove('hidden');
+              renderMyProfilePage();
+              break;
+            case 'home':
+            default:
+              document.getElementById('page-home').classList.remove('hidden');
+              renderHomePage();
+              break;
           }
         } else {
-          document.getElementById('client-nav-buttons').classList.remove('hidden');
-          document.getElementById('consultant-nav-buttons').classList.add('hidden');
+          switch(pageName) {
+            case 'login':
+              document.getElementById('page-login').classList.remove('hidden');
+              renderLoginPage();
+              break;
+            case 'landing':
+            default:
+              document.getElementById('page-landing').classList.remove('hidden');
+              renderLandingPage();
+              break;
+          }
         }
-
-        switch (page) {
-          case 'home':
-            document.getElementById('page-home').classList.remove('hidden');
-            renderHomePage();
-            break;
-          case 'checklist':
-            document.getElementById('page-checklist').classList.remove('hidden');
-            renderChecklistPage();
-            break;
-          case 'profile':
-            document.getElementById('page-profile').classList.remove('hidden');
-            renderMyProfilePage();
-            break;
-          case 'consultant':
-            document.getElementById('page-consultant-dashboard').classList.remove('hidden');
-            renderConsultantPage();
-            break;
-          case 'client':
-            document.getElementById('page-consultant-client').classList.remove('hidden');
-            renderClientProfilePage();
-            break;
+        
+        document.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-md'));
+        const activeNavButton = document.getElementById(`nav-${pageName.replace('consultant', 'consultant-dashboard').replace('client', 'consultant-client')}`);
+        if(activeNavButton) {
+          activeNavButton.classList.add('bg-indigo-600', 'text-white', 'shadow-md');
         }
-      }
     }
 
     // Modal functions
-    function showModal(title, message) {
+    function showModal(title, message, isUpload = false) {
       document.getElementById('modal-title').innerText = title;
       document.getElementById('modal-message').innerText = message;
+      document.getElementById('upload-progress-container').classList.add('hidden');
+      document.getElementById('modal-ok-btn').classList.remove('hidden');
+      
+      if (isUpload) {
+        document.getElementById('modal-message').classList.add('hidden');
+        document.getElementById('upload-progress-container').classList.remove('hidden');
+        document.getElementById('modal-ok-btn').classList.add('hidden');
+      } else {
+        document.getElementById('modal-message').classList.remove('hidden');
+      }
+
       document.getElementById('modal').classList.remove('opacity-0', 'invisible');
       document.querySelector('#modal > div').classList.remove('scale-95');
     }
     function hideModal() {
       document.getElementById('modal').classList.add('opacity-0', 'invisible');
       document.querySelector('#modal > div').classList.add('scale-95');
+      document.getElementById('upload-progress-bar').style.width = '0%';
+      document.getElementById('upload-progress-text').innerText = '0%';
     }
     document.getElementById('modal-close-btn').addEventListener('click', hideModal);
     document.getElementById('modal-ok-btn').addEventListener('click', hideModal);
-
+    
     // Page rendering functions
+    function renderLandingPage() {
+        const landingPageHtml = `
+          <header class="w-full flex justify-between items-center py-4 px-6 fixed top-0 left-0 right-0 bg-white bg-opacity-80 backdrop-blur-md z-10">
+            <div class="flex items-center space-x-2">
+                <div class="font-bold text-xl text-slate-800">HaCeRa</div>
+            </div>
+            <nav class="flex space-x-4 items-center">
+                <a href="#" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Features</a>
+                <a href="#" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Pricing</a>
+                <a href="#" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">About Us</a>
+                <a href="#" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Contact</a>
+                <button id="get-started-btn-header" class="px-4 py-2 bg-indigo-600 text-white rounded-full font-bold text-sm shadow-lg hover:bg-indigo-700 transition-colors transform hover:scale-105">Get Started</button>
+            </nav>
+          </header>
+          <div class="flex flex-col sm:flex-row items-center justify-center p-8 bg-white rounded-3xl shadow-2xl mt-24">
+            <div class="flex flex-col items-start text-left w-full sm:w-1/2 p-4">
+                <div class="font-bold text-lg text-slate-500 mb-4">HaCeRa</div>
+                <h1 class="font-extrabold text-3xl sm:text-5xl lg:text-6xl text-slate-800 leading-tight">
+                    Halal Certificate <br class="hidden sm:block"> Readiness <br class="hidden sm:block"> Assessment
+                </h1>
+                <p class="mt-4 text-sm sm:text-lg text-slate-600 max-w-sm">
+                    Towards Automation of the Halal Application Process
+                </p>
+                <button id="get-started-btn-body" class="mt-8 px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">
+                    Get Started
+                </button>
+            </div>
+            <div class="relative w-full sm:w-1/2 p-4 flex items-center justify-center min-h-[300px] sm:min-h-[500px]">
+              <img id="landing-hero-image" class="w-full h-auto object-contain transition-opacity duration-500 opacity-0" />
+            </div>
+          </div>
+        `;
+        document.getElementById('page-landing').innerHTML = landingPageHtml;
+        document.getElementById('get-started-btn-header').addEventListener('click', () => renderPage('login'));
+        document.getElementById('get-started-btn-body').addEventListener('click', () => renderPage('login'));
+
+        const imageUrlEl = document.getElementById('landing-hero-image');
+        imageUrlEl.src = "https://raw.githubusercontent.com/goldigger79/HaCeRaapp/main/image%201.png";
+        imageUrlEl.onload = () => { imageUrlEl.classList.remove('opacity-0'); };
+        imageUrlEl.onerror = () => { imageUrlEl.src = "https://placehold.co/1200x800/e0f2fe/1e3a8a?text=Image+Failed+to+Load"; imageUrlEl.classList.remove('opacity-0'); };
+    }
+
     function renderLoginPage() {
       const loginPageHtml = `
         <div class="flex flex-col items-center justify-center p-8 bg-white rounded-3xl shadow-2xl max-w-lg mx-auto mt-20">
@@ -264,26 +423,38 @@
             <div class="text-sm text-slate-500">Halal Certificate Readiness Assessment</div>
           </div>
           <h2 class="text-4xl font-extrabold text-center text-slate-800">Welcome</h2>
-          <p class="mt-2 text-center text-slate-600">Please select your role to continue to the Halal Certificate Readiness Assessment.</p>
+          <p class="mt-2 text-center text-slate-600">Please log in or sign up to get started.</p>
           <div class="mt-8 w-full space-y-4">
-            <button id="client-login-btn" class="w-full py-4 px-6 bg-indigo-600 text-white rounded-full font-semibold shadow-lg hover:bg-indigo-700 transition-colors transform hover:scale-105">
-              Log in as Client
-            </button>
-            <button id="consultant-login-btn" class="w-full py-4 px-6 border border-slate-300 text-slate-800 rounded-full font-semibold hover:bg-slate-100 transition-colors transform hover:scale-105">
-              Log in as Consultant
+            <div id="client-auth-form" class="space-y-4 p-4 border rounded-xl bg-slate-50">
+              <label class="block">
+                <span class="text-sm font-medium text-slate-700">Email</span>
+                <input type="email" id="client-email-input" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" />
+              </label>
+              <label class="block">
+                <span class="text-sm font-medium text-slate-700">Password</span>
+                <input type="password" id="client-password-input" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-ring-opacity-50" />
+              </label>
+              <button id="client-login-btn" class="w-full py-3 px-6 bg-indigo-600 text-white rounded-lg font-semibold shadow-lg hover:bg-indigo-700 transition-colors transform hover:scale-105">
+                Log In
+              </button>
+              <button id="client-signup-btn" class="w-full py-3 px-6 border border-slate-300 text-slate-800 rounded-lg font-semibold hover:bg-slate-100 transition-colors transform hover:scale-105">
+                Sign Up
+              </button>
+              <button id="forgot-password-btn" class="w-full text-sm text-indigo-500 hover:text-indigo-700 transition-colors duration-200 mt-2">
+                Forgot password?
+              </button>
+            </div>
+            <button id="go-home-btn" class="w-full py-4 px-6 border border-slate-300 text-slate-800 rounded-full font-semibold hover:bg-slate-100 transition-colors transform hover:scale-105">
+              Home
             </button>
           </div>
         </div>
       `;
       document.getElementById('page-login').innerHTML = loginPageHtml;
-      document.getElementById('client-login-btn').addEventListener('click', () => {
-        isConsultant = false;
-        handleLogin();
-      });
-      document.getElementById('consultant-login-btn').addEventListener('click', () => {
-        isConsultant = true;
-        handleLogin();
-      });
+      document.getElementById('client-login-btn').addEventListener('click', () => handleClientLogin('login'));
+      document.getElementById('client-signup-btn').addEventListener('click', () => handleClientLogin('signup'));
+      document.getElementById('forgot-password-btn').addEventListener('click', handlePasswordReset);
+      document.getElementById('go-home-btn').addEventListener('click', () => renderPage('landing'));
     }
     
     function getProgress() {
@@ -299,11 +470,60 @@
         ? "Business owners often find the Halal certification process to be complex and heavy on documentation. HaCeRa is designed to automate readiness checks, provide clear progress visualization, and give a powerful dashboard to track progress efficiently."
         : "Navigating the Halal certification process can be complex. HaCeRa simplifies this by helping you track your readiness, visualize your progress, and manage all your documentation in one place. Your consultant can also view your progress, making collaboration easier than ever.";
       
+      const missingRequired = checklist.filter(item => item.required && !item.done);
+      const nextSteps = missingRequired.slice(0, 3);
+      
+      const nextStepsHtml = nextSteps.length > 0 ? `
+        <h4 class="font-semibold text-lg text-slate-700 mt-8">Next Steps & Priorities</h4>
+        <ul class="mt-2 text-sm text-slate-600 space-y-2">
+          ${nextSteps.map(item => `
+            <li class="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M15 12a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              ${item.title}
+            </li>
+          `).join('')}
+        </ul>
+      ` : `
+        <div class="mt-8 text-center text-slate-500">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-green-500" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+          </svg>
+          <p class="mt-2 text-lg font-semibold text-green-700">All required items are complete!</p>
+          <p class="text-sm">You are ready for the next step of the application process.</p>
+        </div>
+      `;
+      
+      const documentsSubmitted = checklist.filter(item => item.fileUrl).length;
+      const requiredItemsRemaining = checklist.filter(item => item.required && !item.done).length;
+      const consultantComments = checklist.filter(item => item.comment).length;
+
+      const kpiHtml = `
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="bg-indigo-50 p-4 rounded-xl text-center">
+              <div class="text-xl font-bold text-indigo-600">${documentsSubmitted}</div>
+              <div class="text-sm text-indigo-800">Documents Submitted</div>
+            </div>
+            <div class="bg-rose-50 p-4 rounded-xl text-center">
+              <div class="text-xl font-bold text-rose-600">${requiredItemsRemaining}</div>
+              <div class="text-sm text-rose-800">Required Remaining</div>
+            </div>
+            <div class="bg-cyan-50 p-4 rounded-xl text-center">
+              <div class="text-xl font-bold text-cyan-600">${consultantComments}</div>
+              <div class="text-sm text-cyan-800">Consultant Comments</div>
+            </div>
+          </div>
+      `;
+
       const homePageHtml = `
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div class="md:col-span-2 bg-white p-6 sm:p-8 rounded-3xl shadow-xl">
             <h2 class="text-2xl font-semibold text-slate-800">Why HaCeRa?</h2>
             <p class="mt-4 text-slate-600">${text}</p>
+            <div id="dynamic-dashboard-info" class="mt-6">
+              ${kpiHtml}
+            </div>
             <div class="mt-8 flex gap-4 flex-wrap">
               <button id="start-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">Start Checklist</button>
               <a class="px-6 py-3 border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-100 transition-colors duration-200" href="#sample-links">Sample documents</a>
@@ -322,13 +542,15 @@
               <h3 class="font-semibold text-lg">Current readiness</h3>
               <div class="mt-4">
                 <div class="text-sm text-slate-500">Completed</div>
-                <div class="mt-1 text-4xl font-bold">${progress.done}/${progress.total}</div>
-                <div class="mt-6">
-                  <div class="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
-                    <div style="width: ${progress.percent}%" class="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all duration-500 ease-out"></div>
-                  </div>
+                <div class="mt-1 text-4xl font-bold text-center">${progress.done}/${progress.total}</div>
+                <div class="w-full max-w-[176px] h-44 mt-6 mx-auto">
+                    <svg viewBox="0 0 100 100" class="w-full h-full">
+                      <circle cx="50" cy="50" r="40" fill="none" stroke="#E5E7EB" stroke-width="20" />
+                      <path d="M 50 10 A 40 40 0 ${progress.percent > 50 ? 1 : 0} 1 ${50 + 40 * Math.sin(2 * Math.PI * progress.percent / 100)} ${50 - 40 * Math.cos(2 * Math.PI * progress.percent / 100)}" fill="none" stroke="#10B981" stroke-width="20" stroke-linecap="round" />
+                    </svg>
                 </div>
               </div>
+              ${nextStepsHtml}
             </div>
             <div class="mt-8">
               <h4 class="font-semibold text-lg text-slate-700">Quick Tips</h4>
@@ -338,12 +560,12 @@
                 <li>Use HaCeRa to track progress and generate reports for your consultant.</li>
               </ul>
             </div>
-          </div>
+          </aside>
         </div>
       `;
       document.getElementById('page-home').innerHTML = homePageHtml;
       document.getElementById('start-btn').addEventListener('click', () => {
-        setPage(isConsultant ? 'consultant' : 'checklist');
+        renderPage(isConsultant ? 'consultant' : 'checklist');
       });
     }
 
@@ -375,6 +597,9 @@
                               ${item.required ? 'Required' : 'Optional'}
                               <span class="mx-1">•</span>
                               <a class="underline text-indigo-500 hover:text-indigo-600" href="${item.sampleLink}" target="_blank" rel="noreferrer">Sample</a>
+                              <button class="clarify-btn text-indigo-500 hover:text-indigo-600 ml-2" data-item-title="${item.title}">
+                                ✨ Get Clarification
+                              </button>
                             </div>
                             ${item.comment ? `
                               <div class="mt-3 p-3 rounded-lg bg-indigo-50 text-sm text-slate-700 border border-indigo-100">
@@ -385,16 +610,26 @@
                         </div>
                         <div class="mt-4 sm:mt-0 flex-shrink-0">
                         ${item.done ? `
-                          <div class="text-sm text-green-600 flex items-center gap-1 font-medium">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
-                              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
-                            </svg>
-                            Completed
-                          </div>
+                          ${item.fileUrl ? `
+                            <a href="${item.fileUrl}" target="_blank" rel="noopener noreferrer" class="text-sm text-indigo-600 flex items-center gap-1 font-medium hover:underline">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+                              </svg>
+                              View Document
+                            </a>
+                          ` : `
+                            <div class="text-sm text-green-600 flex items-center gap-1 font-medium">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+                              </svg>
+                              Completed
+                            </div>
+                          `}
                         ` : `
-                          <button class="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600 transition-colors duration-200 transform hover:scale-105 upload-btn" data-id="${item.id}">
+                          <label for="upload-input-${item.id}" class="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600 transition-colors duration-200 transform hover:scale-105 cursor-pointer">
                             Upload File
-                          </button>
+                          </label>
+                          <input type="file" id="upload-input-${item.id}" class="hidden upload-input" accept="application/pdf,image/jpeg" data-id="${item.id}" />
                         `}
                         </div>
                       </div>
@@ -434,8 +669,13 @@
       document.querySelectorAll('.toggle-checkbox').forEach(cb => {
         cb.addEventListener('change', () => toggleDone(parseInt(cb.dataset.id)));
       });
-      document.querySelectorAll('.upload-btn').forEach(btn => {
-        btn.addEventListener('click', () => handleUpload(parseInt(btn.dataset.id)));
+      document.querySelectorAll('.upload-input').forEach(input => {
+        input.addEventListener('change', (e) => handleUpload(parseInt(e.target.dataset.id), e.target.files));
+      });
+      document.querySelectorAll('.clarify-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          generateClarification(e.target.dataset.itemTitle);
+        });
       });
     }
 
@@ -453,7 +693,7 @@
               </label>
               <label class="block">
                 <span class="text-sm font-medium text-slate-700">Company Type</span>
-                <input type="text" id="companyType" value="${profile.companyType || ''}" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 transition-colors duration-200" />
+                <input type="text" id="companyType" value="${profile.companyType || ''}" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-ring-indigo-200 focus:ring-opacity-50 transition-colors duration-200" />
               </label>
               <label class="block">
                 <span class="text-sm font-medium text-slate-700">Contact Person</span>
@@ -508,22 +748,6 @@
     }
     
     function renderConsultantPage() {
-      clients = createSampleClients(); // Reset sample clients
-      const tableRows = clients.map(c => `
-        <tr class="border-t border-slate-200 transition-all duration-200 hover:bg-slate-50">
-          <td class="p-4 font-medium text-slate-800">${c.name}</td>
-          <td class="p-4 text-sm text-slate-600">${c.type}</td>
-          <td class="p-4">${c.status}</td>
-          <td class="p-4 w-64">
-            <div class="text-sm">${c.progress}%</div>
-            <div class="w-full bg-slate-200 h-2 rounded-full mt-1"><div style="width: ${c.progress}%" class="h-full bg-gradient-to-r from-indigo-500 to-cyan-400"></div></div>
-          </td>
-          <td class="p-4 text-sm text-slate-500">${c.updated}</td>
-          <td class="p-4">
-            <button class="open-client-btn px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-medium hover:bg-slate-100 transition-colors duration-200" data-id="${c.id}">Open</button>
-          </td>
-        </tr>
-      `).join('');
       const consultantHtml = `
         <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-xl">
           <div class="flex justify-between items-center mb-6 flex-wrap gap-2">
@@ -542,8 +766,8 @@
                   <th class="p-4">Action</th>
                 </tr>
               </thead>
-              <tbody>
-                ${tableRows}
+              <tbody id="clients-table-body">
+                <tr><td colspan="6" class="p-4 text-center text-slate-500">Loading clients...</td></tr>
               </tbody>
             </table>
           </div>
@@ -551,17 +775,65 @@
         </div>
       `;
       document.getElementById('page-consultant-dashboard').innerHTML = consultantHtml;
+      
+      const publicClientsCollectionRef = collection(db, PUBLIC_DATA_PATH);
+      if (unsubscribeConsultantListener) unsubscribeConsultantListener();
+      unsubscribeConsultantListener = onSnapshot(publicClientsCollectionRef, (querySnapshot) => {
+        clients = [];
+        querySnapshot.forEach(docSnap => {
+            const clientData = docSnap.data();
+            clients.push({
+              id: docSnap.id,
+              name: clientData.profile?.companyName || `Client ${docSnap.id.substring(0, 5)}`,
+              type: clientData.profile?.companyType || 'N/A',
+              status: clientData.progress === 100 ? 'Ready' : 'In progress',
+              progress: clientData.progress || 0,
+              updated: clientData.updated || 'N/A',
+              assessment: clientData.assessment || []
+            });
+        });
+        updateConsultantTable();
+      }, (error) => {
+        console.error("Error fetching client profiles:", error);
+        document.getElementById('clients-table-body').innerHTML = `<tr><td colspan="6" class="p-4 text-center text-rose-500">Failed to load clients. Permissions might be insufficient.</td></tr>`;
+      });
+    }
+
+    function updateConsultantTable() {
+      const tableBody = document.getElementById('clients-table-body');
+      if (!tableBody) return;
+      
+      const tableRows = clients.map(c => `
+        <tr class="border-t border-slate-200 transition-all duration-200 hover:bg-slate-50">
+          <td class="p-4 font-medium text-slate-800">${c.name}</td>
+          <td class="p-4 text-sm text-slate-600">${c.type}</td>
+          <td class="p-4">${c.status}</td>
+          <td class="p-4 w-64">
+            <div class="text-sm">${c.progress}%</div>
+            <div class="w-full bg-slate-200 h-2 rounded-full mt-1"><div style="width: ${c.progress}%" class="h-full bg-gradient-to-r from-indigo-500 to-cyan-400"></div></div>
+          </td>
+          <td class="p-4 text-sm text-slate-500">${c.updated}</td>
+          <td class="p-4">
+            <button class="open-client-btn px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-medium hover:bg-slate-100 transition-colors duration-200" data-id="${c.id}">Open</button>
+          </td>
+        </tr>
+      `).join('');
+      tableBody.innerHTML = tableRows || `<tr><td colspan="6" class="p-4 text-center text-slate-500">No clients found. Have a client log in to create a profile.</td></tr>`;
+
       document.querySelectorAll('.open-client-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           selectedClientId = btn.dataset.id;
-          renderPage('client');
+          updateUI();
         });
       });
     }
 
     function renderClientProfilePage() {
       const client = clients.find(c => c.id === selectedClientId);
-      if (!client) return;
+      if (!client) {
+          renderPage('consultant');
+          return;
+      }
 
       const assessmentHtml = client.assessment.map(it => `
         <div class="p-5 border border-slate-200 rounded-2xl bg-slate-50/50">
@@ -573,7 +845,11 @@
                 <div class="text-sm text-slate-500 mt-1">
                   ${it.category}
                   <span class="mx-1">•</span>
-                  <a class="underline text-indigo-500 hover:text-indigo-600" href="${it.sampleLink}" target="_blank" rel="noreferrer">Sample</a>
+                  ${it.fileUrl ? `
+                    <a href="${it.fileUrl}" target="_blank" rel="noopener noreferrer" class="underline text-indigo-500 hover:text-indigo-600">View File</a>
+                  ` : `
+                    <a class="underline text-indigo-500 hover:text-indigo-600" href="${it.sampleLink}" target="_blank" rel="noreferrer">Sample</a>
+                  `}
                 </div>
               </div>
             </div>
@@ -614,71 +890,84 @@
               </div>
             </div>
             <div class="mt-8 flex gap-4 flex-wrap">
-              <button id="generate-report-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">Generate report</button>
+              <button id="save-consultant-changes-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">Save Changes</button>
+              <button id="generate-report-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">✨ Generate Report</button>
               <button id="message-client-btn" class="px-6 py-3 border border-slate-300 rounded-lg font-medium hover:bg-slate-100 transition-colors duration-200">Message client</button>
             </div>
           </div>
           <aside class="bg-white p-6 sm:p-8 rounded-3xl shadow-xl">
             <h3 class="font-semibold text-lg">Summary</h3>
-            <div class="mt-4">
-              <div class="text-sm text-slate-500">Last updated</div>
-              <div class="text-sm font-medium mt-1">${client.updated}</div>
-              <div class="mt-6">
-                <h4 class="font-semibold text-lg">Notes</h4>
-                <div class="mt-2 text-sm text-slate-600">${client.notes || 'No notes yet. Use this area to add consultant observations.'}</div>
-              </div>
-            </div>
+            <div id="summary-report-content" class="mt-4 text-sm text-slate-600">${client.notes || 'Click "Generate Report" to get an AI-powered summary of the client\'s progress.'}</div>
           </aside>
         </div>
       `;
       document.getElementById('page-consultant-client').innerHTML = clientProfileHtml;
 
-      document.querySelectorAll('.consultant-toggle-checkbox').forEach(cb => {
-        cb.addEventListener('change', (e) => {
-          const id = parseInt(e.target.dataset.id);
-          const clientIndex = clients.findIndex(c => c.id === selectedClientId);
-          if (clientIndex !== -1) {
-            const itemIndex = clients[clientIndex].assessment.findIndex(a => a.id === id);
-            if (itemIndex !== -1) {
-              clients[clientIndex].assessment[itemIndex].done = e.target.checked;
-              clients[clientIndex].progress = Math.round((clients[clientIndex].assessment.filter(x => x.done).length / clients[clientIndex].assessment.length) * 100);
-            }
-          }
+      document.getElementById('save-consultant-changes-btn').addEventListener('click', () => {
+        const currentClient = clients.find(c => c.id === selectedClientId);
+        if (!currentClient) return;
+
+        const updatedAssessment = currentClient.assessment.map(item => {
+          const checkbox = document.getElementById(`consultant-cb-${item.id}`);
+          const textarea = document.getElementById(`comment-ta-${item.id}`);
+          return {
+            ...item,
+            done: checkbox.checked,
+            comment: textarea.value
+          };
+        });
+
+        const updatedProgress = Math.round((updatedAssessment.filter(x => x.done).length / updatedAssessment.length) * 100);
+        saveConsultantAssessment(selectedClientId, {
+          assessment: updatedAssessment,
+          progress: updatedProgress,
+          updated: new Date().toLocaleString()
         });
       });
 
-      document.querySelectorAll('.consultant-comment').forEach(ta => {
-        ta.addEventListener('change', (e) => {
-          const id = parseInt(e.target.dataset.id);
-          const clientIndex = clients.findIndex(c => c.id === selectedClientId);
-          if (clientIndex !== -1) {
-            const itemIndex = clients[clientIndex].assessment.findIndex(a => a.id === id);
-            if (itemIndex !== -1) {
-              clients[clientIndex].assessment[itemIndex].comment = e.target.value;
-            }
-          }
-        });
-      });
 
       document.getElementById('generate-report-btn').addEventListener('click', () => {
-        showModal('Report Generated', 'A readiness report has been successfully generated for this client.');
+        generateReport(client.name, client.assessment);
       });
       document.getElementById('message-client-btn').addEventListener('click', () => {
         showModal('Message Sent', 'A notification has been sent to the client via email.');
       });
     }
 
+    async function saveConsultantAssessment(clientId, updates) {
+      if (!isConsultant) return;
+      try {
+        const publicDocRef = doc(db, PUBLIC_DATA_PATH, clientId);
+        await setDoc(publicDocRef, updates, { merge: true });
+        showModal('Changes Saved', 'The client\'s assessment has been successfully updated.');
+      } catch (e) {
+        console.error("Error saving consultant changes:", e);
+        showModal('Save Failed', `An error occurred while saving changes: ${e.message}`);
+      }
+    }
+
+
     // Data persistence functions
     async function saveAssessment() {
       if (!userId || isConsultant) return;
       try {
-        const clientDocRef = doc(db, PRIVATE_DATA_PATH(userId), 'profile');
+        const privateDocRef = doc(db, PRIVATE_DATA_PATH(userId), 'profile');
+        const publicDocRef = doc(db, PUBLIC_DATA_PATH, userId);
         const progress = Math.round((checklist.filter(x => x.done).length / checklist.length) * 100);
-        await setDoc(clientDocRef, {
+        
+        await setDoc(privateDocRef, {
           assessment: checklist,
           progress,
           updated: new Date().toLocaleString()
         }, { merge: true });
+
+        // Update the public data for the consultant
+        await setDoc(publicDocRef, {
+          assessment: checklist,
+          progress,
+          updated: new Date().toLocaleString()
+        }, { merge: true });
+
       } catch (e) {
         console.error("Error saving assessment:", e);
       }
@@ -687,70 +976,207 @@
     async function saveProfile(newProfile) {
       if (!userId || isConsultant) return;
       try {
-        const clientDocRef = doc(db, PRIVATE_DATA_PATH(userId), 'profile');
-        await setDoc(clientDocRef, {
+        const privateDocRef = doc(db, PRIVATE_DATA_PATH(userId), 'profile');
+        const publicDocRef = doc(db, PUBLIC_DATA_PATH, userId);
+        
+        await setDoc(privateDocRef, {
           profile: newProfile,
           updated: new Date().toLocaleString()
         }, { merge: true });
+        
+        await setDoc(publicDocRef, {
+            profile: newProfile,
+            updated: new Date().toLocaleString()
+        }, { merge: true });
+
         showModal('Profile Saved', 'Your company profile has been successfully saved.');
       } catch (e) {
         console.error("Error saving profile:", e);
+        showModal('Save Failed', `An error occurred while saving your profile: ${e.message}`);
       }
     }
 
-    // Event handlers
-    async function handleLogin() {
+    // Authentication functions
+    async function handleClientLogin(type) {
+      const email = document.getElementById('client-email-input').value;
+      const password = document.getElementById('client-password-input').value;
+
+      if (!email || !password) {
+        showModal('Login Failed', 'Please enter both email and password.');
+        return;
+      }
+
       try {
-        if (!auth) {
-          console.error("Firebase Auth is not initialized.");
-          return;
+        if (type === 'signup') {
+          // Attempt to sign up
+          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+          const user = userCredential.user;
+          
+          await setDoc(doc(db, USERS_COLLECTION, user.uid), {
+            email: user.email,
+            role: 'client'
+          });
+          showModal('Sign Up Successful', 'Your account has been created. You can now log in.');
+
+        } else if (type === 'login') {
+          // Attempt to log in
+          await signInWithEmailAndPassword(auth, email, password);
         }
-        await signInAnonymously(auth);
-        setPage('home');
-      } catch (e) {
-        console.error("Login failed:", e);
+
+      } catch (error) {
+        let message = 'An unknown error occurred.';
+        if (error.code === 'auth/email-already-in-use') {
+            message = 'This email is already registered. Please log in instead.';
+        } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+            message = 'Invalid email or password. Please try again.';
+        } else if (error.code === 'auth/weak-password') {
+            message = 'The password is too weak. Please use at least 6 characters.';
+        } else if (error.code === 'auth/invalid-email') {
+            message = 'The email address is not valid.';
+        } else {
+            message = `Login failed: ${error.message}`;
+        }
+        console.error("Login failed:", error);
+        showModal('Login Failed', message);
       }
     }
 
-    async function handleLogout() {
+    async function handlePasswordReset() {
+      const email = document.getElementById('client-email-input').value;
+      if (!email) {
+        showModal('Forgot Password', 'Please enter your email address to reset your password.');
+        return;
+      }
       try {
-        if (auth) {
-          await signOut(auth);
-        }
-        page = 'login';
-        isConsultant = false;
-        renderPage('login');
-      } catch (e) {
-        console.error("Logout failed:", e);
+        await sendPasswordResetEmail(auth, email);
+        showModal('Password Reset', `A password reset link has been sent to ${email}. Please check your inbox.`);
+      } catch (error) {
+        console.error("Password reset failed:", error);
+        showModal('Password Reset Failed', 'An error occurred while sending the password reset email. Please try again later.');
       }
     }
 
-    function setPage(newPage) {
-      page = newPage;
-      renderPage(page);
+    function handleLogout() {
+      signOut(auth);
+      selectedClientId = null;
+      updateUI();
+    }
+    document.getElementById('logout-button').addEventListener('click', handleLogout);
+
+    // File upload logic
+    async function handleUpload(itemId, files) {
+      if (files.length === 0) return;
+      const file = files[0];
+
+      // File size and type validation
+      const MAX_SIZE_MB = 5;
+      const allowedTypes = ['application/pdf', 'image/jpeg'];
+      if (!allowedTypes.includes(file.type)) {
+        showModal('Upload Failed', 'Unsupported file type. Please upload a PDF or JPEG file.');
+        return;
+      }
+      if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+        showModal('Upload Failed', `File size exceeds the ${MAX_SIZE_MB}MB limit.`);
+        return;
+      }
+
+      showModal('Uploading...', 'Please wait while your file is being uploaded.', true);
+      
+      const storageRef = ref(storage, `artifacts/${appId}/users/${userId}/documents/${itemId}-${file.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          document.getElementById('upload-progress-bar').style.width = `${progress}%`;
+          document.getElementById('upload-progress-text').innerText = `${Math.round(progress)}%`;
+        }, 
+        (error) => {
+          console.error("Upload failed:", error);
+          showModal('Upload Failed', `An error occurred during upload: ${error.message}`);
+        }, 
+        async () => {
+          const fileUrl = await getDownloadURL(uploadTask.snapshot.ref);
+          const updatedChecklist = checklist.map(item => item.id === itemId ? { ...item, done: true, fileUrl: fileUrl } : item);
+          checklist = updatedChecklist;
+          await saveAssessment();
+          hideModal();
+          showModal('Upload Successful', 'The file has been uploaded and the item is marked as complete.');
+        }
+      );
+    }
+    
+    // Gemini API integration
+    const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=";
+    const API_KEY = ""; // Leave this empty, Canvas will provide it
+    const GEMINI_API_IMAGE_URL = "https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=";
+
+    async function generateClarification(itemTitle) {
+      showModal('Generating Clarification', 'Please wait...', false);
+      try {
+        const systemPrompt = "You are a professional Halal consultant. Provide a concise, clear, and simple explanation of a checklist item for a small business owner. The explanation should be in a friendly, conversational tone.";
+        const userQuery = `Explain "${itemTitle}" from a Halal certification checklist.`;
+        
+        const payload = {
+            contents: [{ parts: [{ text: userQuery }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+        };
+
+        const response = await fetch(`${GEMINI_API_URL}${API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        const generatedText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (generatedText) {
+          showModal('Clarification', generatedText);
+        } else {
+          showModal('Error', 'Failed to generate clarification. Please try again.');
+        }
+      } catch (e) {
+        console.error("Clarification failed:", e);
+        showModal('Error', `Failed to generate clarification: ${e.message}`);
+      }
     }
 
-    function toggleDone(id) {
-      const updated = checklist.map(it => it.id === id ? { ...it, done: !it.done } : it);
-      checklist = updated;
-      saveAssessment();
+    async function generateReport(clientName, assessment) {
+      showModal('Generating Report', 'Analyzing data and compiling report...', false);
+      try {
+        const systemPrompt = `You are a professional Halal consultant. Analyze the provided Halal certification checklist data for a client. Provide a concise, single-paragraph summary of their readiness. Highlight the percentage of completed items, mention key documents they have successfully prepared, and list any critical, required items that are still missing. The tone should be professional and encouraging.`;
+        const userQuery = `Generate a readiness report for client "${clientName}". Here is their checklist data in JSON format: ${JSON.stringify(assessment)}`;
+        
+        const payload = {
+            contents: [{ parts: [{ text: userQuery }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+        };
+
+        const response = await fetch(`${GEMINI_API_URL}${API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        const generatedText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (generatedText) {
+          document.getElementById('summary-report-content').innerText = generatedText;
+          showModal('Report Generated', 'The report has been successfully generated and added to the summary section.');
+        } else {
+          showModal('Error', 'Failed to generate report. Please try again.');
+        }
+      } catch (e) {
+        console.error("Report generation failed:", e);
+        showModal('Error', `Failed to generate report: ${e.message}`);
+      }
     }
 
-    function handleUpload(id) {
-      const updated = checklist.map(it => it.id === id ? { ...it, done: true } : it);
-      checklist = updated;
-      saveAssessment();
-      showModal('Upload Successful', 'The file has been successfully uploaded and the item is marked as complete. Your consultant will be able to view it shortly.');
-    }
-
-    // Initial page load
+    // Initial page render
     window.onload = () => {
-      renderLoginPage();
-      document.getElementById('logout-button').addEventListener('click', handleLogout);
-      document.getElementById('nav-home').addEventListener('click', () => setPage('home'));
-      document.getElementById('nav-checklist').addEventListener('click', () => setPage('checklist'));
-      document.getElementById('nav-profile').addEventListener('click', () => setPage('profile'));
-      document.getElementById('nav-consultant-dashboard').addEventListener('click', () => setPage('consultant'));
+        updateUI();
     };
   </script>
 </body>
