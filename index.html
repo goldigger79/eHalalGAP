@@ -67,7 +67,8 @@
         </div>
         <div class="text-right text-xs text-slate-500 mt-1"><span id="upload-progress-text">0%</span> uploaded</div>
       </div>
-      <div class="mt-8 text-right">
+      <div class="mt-8 flex justify-end gap-2">
+        <button id="modal-cancel-btn" class="px-6 py-3 border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-100 transition-colors duration-200 hidden">Cancel</button>
         <button id="modal-ok-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors duration-200">Close</button>
       </div>
     </div>
@@ -76,7 +77,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, createUserWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, doc, onSnapshot, setDoc, getDoc, setLogLevel, collection, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import { getFirestore, doc, onSnapshot, setDoc, getDoc, setLogLevel, collection, query, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
     import { getStorage, ref, uploadBytes, getDownloadURL, uploadBytesResumable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
     // Global state variables
@@ -90,6 +91,9 @@
     let unsubscribeClientListener = null;
     let unsubscribeConsultantListener = null;
     let isAuthReady = false;
+
+    // Hard-coded UID for the admin account
+    const CONSULTANT_UID = 'o9TAB1xoRiQxX2P8PcuE5K0xhWn2';
 
     // Global Firebase instances
     let app, auth, db, storage;
@@ -159,16 +163,20 @@
                 try {
                     const userDocRef = doc(db, USERS_COLLECTION, userId);
                     const userDocSnap = await getDoc(userDocRef);
+                    let userRole = '';
                     if (userDocSnap.exists()) {
-                        const userRole = userDocSnap.data().role;
-                        isConsultant = (userRole === 'consultant');
+                        userRole = userDocSnap.data().role;
                     } else {
+                        // Create a new user record for a first-time login
                         await setDoc(userDocRef, {
                             email: user.email,
                             role: 'client'
                         });
-                        isConsultant = false;
+                        userRole = 'client';
                     }
+                    
+                    // Check if the authenticated user's UID matches the hard-coded consultant UID
+                    isConsultant = (userRole === 'consultant' || user.uid === CONSULTANT_UID);
                     
                     if (!isConsultant) {
                         const clientDocRef = doc(db, PRIVATE_DATA_PATH(userId), 'profile');
@@ -182,10 +190,10 @@
                                 updated: new Date().toLocaleString()
                             });
                             await setDoc(publicDocRef, {
-                              profile: { companyName: '', companyType: '', contactName: '', contactEmail: '', contactPhone: '' },
-                              assessment: SAMPLE_CHECKLIST,
-                              progress: 0,
-                              updated: new Date().toLocaleString()
+                                profile: { companyName: '', companyType: '', contactName: '', contactEmail: '', contactPhone: '' },
+                                assessment: SAMPLE_CHECKLIST,
+                                progress: 0,
+                                updated: new Date().toLocaleString()
                             });
                         }
 
@@ -195,6 +203,11 @@
                             clientData = snap.data();
                             checklist = clientData.assessment;
                             updateUI();
+                          }
+                        }, (error) => {
+                          console.error("Client listener error:", error);
+                          if (error.code === 'permission-denied') {
+                              showModal('Permission Error', 'You do not have permission to view your data. Please check your Firebase security rules.', false);
                           }
                         });
                     } else {
@@ -217,13 +230,14 @@
                             updateUI();
                         }, (error) => {
                           console.error("Error fetching client profiles:", error);
-                          // This error is handled by a permission check on the page render
+                          if (error.code === 'permission-denied') {
+                              showModal('Permission Error', 'You do not have permission to view the consultant dashboard. Please check your Firebase security rules.', false);
+                          }
                         });
                     }
                     
                 } catch (e) {
                     console.error("Auth state change error:", e);
-                    // Handle specific errors like "permission-denied"
                 }
 
                 updateUI();
@@ -250,6 +264,16 @@
         const clientNav = document.getElementById('client-nav-buttons');
         const consultantNav = document.getElementById('consultant-nav-buttons');
         const navClientProfile = document.getElementById('nav-consultant-client');
+        const logoutButton = document.getElementById('logout-button');
+        
+        logoutButton.addEventListener('click', async () => {
+          try {
+            await signOut(auth);
+            showModal('Logged Out', 'You have been successfully logged out.');
+          } catch (e) {
+            showModal('Log Out Failed', `An error occurred while logging out: ${e.message}`);
+          }
+        });
 
         if (userId) {
             navBar.classList.remove('hidden');
@@ -271,21 +295,12 @@
     }
 
     function attachNavEventListeners() {
-      document.getElementById('nav-home').addEventListener('click', () => {
-        renderPage('home');
-      });
-      document.getElementById('nav-checklist').addEventListener('click', () => {
-        renderPage('checklist');
-      });
-      document.getElementById('nav-profile').addEventListener('click', () => {
-        renderPage('profile');
-      });
-      document.getElementById('nav-consultant-dashboard').addEventListener('click', () => {
-        renderPage('consultant');
-      });
-      document.getElementById('nav-consultant-client').addEventListener('click', () => {
-        renderPage('client');
-      });
+      // Avoid attaching multiple event listeners
+      document.getElementById('nav-home').onclick = () => renderPage('home');
+      document.getElementById('nav-checklist').onclick = () => renderPage('checklist');
+      document.getElementById('nav-profile').onclick = () => renderPage('profile');
+      document.getElementById('nav-consultant-dashboard').onclick = () => renderPage('consultant');
+      document.getElementById('nav-consultant-client').onclick = () => renderPage('client');
     }
 
     function renderPage(pageName) {
@@ -351,7 +366,14 @@
       document.getElementById('modal-message').innerText = message;
       document.getElementById('upload-progress-container').classList.add('hidden');
       document.getElementById('modal-ok-btn').classList.remove('hidden');
+      document.getElementById('modal-cancel-btn').classList.add('hidden');
+      document.getElementById('modal-ok-btn').innerText = 'Close';
+      document.getElementById('modal-ok-btn').classList.remove('bg-rose-600', 'hover:bg-rose-700');
+      document.getElementById('modal-ok-btn').classList.add('bg-indigo-600', 'hover:bg-indigo-700');
       
+      // Reset button handlers to default
+      document.getElementById('modal-ok-btn').onclick = hideModal;
+
       if (isUpload) {
         document.getElementById('modal-message').classList.add('hidden');
         document.getElementById('upload-progress-container').classList.remove('hidden');
@@ -363,6 +385,34 @@
       document.getElementById('modal').classList.remove('opacity-0', 'invisible');
       document.querySelector('#modal > div').classList.remove('scale-95');
     }
+
+    function showConfirmModal(title, message, onConfirm, onCancel) {
+      document.getElementById('modal-title').innerText = title;
+      document.getElementById('modal-message').innerText = message;
+      document.getElementById('upload-progress-container').classList.add('hidden');
+      document.getElementById('modal-message').classList.remove('hidden');
+
+      document.getElementById('modal-cancel-btn').classList.remove('hidden');
+      document.getElementById('modal-cancel-btn').innerText = 'Cancel';
+      document.getElementById('modal-cancel-btn').onclick = () => {
+        hideModal();
+        if (onCancel) onCancel();
+      };
+      
+      const confirmBtn = document.getElementById('modal-ok-btn');
+      confirmBtn.classList.remove('hidden');
+      confirmBtn.innerText = 'Confirm';
+      confirmBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+      confirmBtn.classList.add('bg-rose-600', 'hover:bg-rose-700');
+      confirmBtn.onclick = () => {
+        hideModal();
+        if (onConfirm) onConfirm();
+      };
+
+      document.getElementById('modal').classList.remove('opacity-0', 'invisible');
+      document.querySelector('#modal > div').classList.remove('scale-95');
+    }
+    
     function hideModal() {
       document.getElementById('modal').classList.add('opacity-0', 'invisible');
       document.querySelector('#modal > div').classList.add('scale-95');
@@ -370,8 +420,178 @@
       document.getElementById('upload-progress-text').innerText = '0%';
     }
     document.getElementById('modal-close-btn').addEventListener('click', hideModal);
-    document.getElementById('modal-ok-btn').addEventListener('click', hideModal);
+
+    async function handleClientLogin(action) {
+      const email = document.getElementById('client-email-input').value;
+      const password = document.getElementById('client-password-input').value;
+
+      if (!email || !password) {
+        showModal('Login Failed', 'Please enter both email and password.');
+        return;
+      }
+
+      try {
+        if (action === 'login') {
+          await signInWithEmailAndPassword(auth, email, password);
+        } else if (action === 'signup') {
+          await createUserWithEmailAndPassword(auth, email, password);
+          // Set initial role for new user. Consultant roles are manually set in Firestore.
+          await setDoc(doc(db, USERS_COLLECTION, auth.currentUser.uid), {
+            email: auth.currentUser.email,
+            role: 'client'
+          });
+        }
+      } catch (e) {
+        let errorMessage = 'An unknown error occurred.';
+        if (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password') {
+          errorMessage = 'Invalid email or password. Please try again.';
+        } else if (e.code === 'auth/email-already-in-use') {
+          errorMessage = 'This email is already in use. Please log in instead.';
+        } else {
+          errorMessage = `Authentication failed: ${e.message}`;
+        }
+        showModal('Authentication Failed', errorMessage);
+        console.error("Auth error:", e);
+      }
+    }
+
+    async function handleUpload(itemId, files) {
+      if (files.length === 0) return;
+      const file = files[0];
+      showModal('Uploading File', 'Please wait while your document is being uploaded...', true);
+      
+      const storageRef = ref(storage, `documents/${userId}/${itemId}-${Date.now()}-${file.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on('state_changed',
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          document.getElementById('upload-progress-bar').style.width = progress + '%';
+          document.getElementById('upload-progress-text').innerText = Math.round(progress) + '%';
+        }, 
+        (error) => {
+          console.error("Upload failed:", error);
+          hideModal();
+          showModal('Upload Failed', `An error occurred: ${error.message}`);
+        }, 
+        async () => {
+          try {
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            await toggleDone(itemId, true, downloadURL);
+            hideModal();
+            showModal('Upload Complete', 'Your document has been successfully uploaded and marked as complete!');
+          } catch (e) {
+            console.error("Error getting download URL or updating Firestore:", e);
+            hideModal();
+            showModal('Upload Error', `The file was uploaded, but an error occurred saving the record: ${e.message}`);
+          }
+        }
+      );
+    }
     
+    async function toggleDone(itemId, checked, fileUrl = null) {
+      const itemIndex = checklist.findIndex(item => item.id === itemId);
+      if (itemIndex === -1) return;
+
+      const newChecklist = [...checklist];
+      newChecklist[itemIndex].done = checked;
+      if (fileUrl) {
+        newChecklist[itemIndex].fileUrl = fileUrl;
+      } else {
+        newChecklist[itemIndex].fileUrl = '';
+      }
+
+      const progress = Math.round((newChecklist.filter(i => i.done).length / newChecklist.length) * 100);
+      
+      // Update both private and public client data
+      const updates = {
+        assessment: newChecklist,
+        progress: progress,
+        updated: new Date().toLocaleString()
+      };
+      
+      try {
+        // Save to private path (client's own data)
+        await setDoc(doc(db, PRIVATE_DATA_PATH(userId), 'profile'), updates, { merge: true });
+        // Save to public path (for consultant to view)
+        await setDoc(doc(db, PUBLIC_DATA_PATH, userId), updates, { merge: true });
+      } catch (e) {
+        console.error("Error updating checklist:", e);
+        showModal('Save Failed', `An error occurred while saving your changes: ${e.message}`);
+      }
+    }
+
+    async function generateClarification(itemTitle) {
+      showModal('Generating Clarification', 'Please wait while we generate a detailed explanation...', true);
+      document.getElementById('upload-progress-container').classList.add('hidden');
+      const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=`;
+      const systemPrompt = "You are a professional Halal certification consultant. Provide a clear, concise, and helpful clarification on a required checklist item for a client. The explanation should be easy to understand and provide practical examples or tips.";
+      const userQuery = `Clarify the document requirement for "${itemTitle}". What is it, why is it needed, and what should be included?`;
+      
+      const payload = {
+        contents: [{ parts: [{ text: userQuery }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        tools: [{ "google_search": {} }]
+      };
+
+      try {
+        const response = await fetch(apiEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || `API responded with status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (text) {
+          hideModal();
+          showModal(`Clarification for "${itemTitle}"`, text);
+        } else {
+          throw new Error('No text generated.');
+        }
+      } catch (e) {
+        console.error("LLM call failed:", e);
+        hideModal();
+        showModal('Error', 'Failed to generate clarification. Please try again later.');
+      }
+    }
+    
+    async function resetClientData() {
+        showConfirmModal('Confirm Reset', 'Are you sure you want to delete ALL client data? This action cannot be undone.', async () => {
+          try {
+            const clientsSnapshot = await getDocs(collection(db, PUBLIC_DATA_PATH));
+            for (const clientDoc of clientsSnapshot.docs) {
+              const clientId = clientDoc.id;
+              await deleteDoc(doc(db, PUBLIC_DATA_PATH, clientId));
+              await deleteDoc(doc(db, PRIVATE_DATA_PATH(clientId), 'profile'));
+            }
+            showModal('Success', 'All client data has been successfully reset.');
+          } catch (e) {
+            showModal('Reset Failed', `An error occurred: ${e.message}`);
+            console.error('Reset failed:', e);
+          }
+        });
+    }
+
+    async function deleteClientData(clientId) {
+        showConfirmModal('Confirm Deletion', 'Are you sure you want to delete this client? This action cannot be undone.', async () => {
+          try {
+            await deleteDoc(doc(db, PUBLIC_DATA_PATH, clientId));
+            await deleteDoc(doc(db, PRIVATE_DATA_PATH(clientId), 'profile'));
+            showModal('Success', 'Client data has been successfully deleted.');
+          } catch (e) {
+            showModal('Deletion Failed', `An error occurred: ${e.message}`);
+            console.error('Deletion failed:', e);
+          }
+        });
+    }
+
     // Page rendering functions
     function renderLandingPage() {
         const landingPageHtml = `
@@ -384,7 +604,7 @@
                 <a href="#" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Pricing</a>
                 <a href="#" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">About Us</a>
                 <a href="#" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Contact</a>
-                <button id="get-started-btn-header" class="px-4 py-2 bg-indigo-600 text-white rounded-full font-bold text-sm shadow-lg hover:bg-indigo-700 transition-colors transform hover:scale-105">Get Started</button>
+                <button id="get-started-btn-header" class="px-4 py-2 bg-indigo-600 text-white rounded-full font-bold text-sm shadow-lg hover:bg-indigo-700 transition-colors transform hover:scale-105">Client Login</button>
             </nav>
           </header>
           <div class="flex flex-col sm:flex-row items-center justify-center p-8 bg-white rounded-3xl shadow-2xl mt-24">
@@ -406,9 +626,14 @@
           </div>
         `;
         document.getElementById('page-landing').innerHTML = landingPageHtml;
-        document.getElementById('get-started-btn-header').addEventListener('click', () => renderPage('login'));
-        document.getElementById('get-started-btn-body').addEventListener('click', () => renderPage('login'));
 
+        document.getElementById('get-started-btn-body').addEventListener('click', () => {
+          renderPage('login');
+        });
+        document.getElementById('get-started-btn-header').addEventListener('click', () => {
+          renderPage('login');
+        });
+        
         const imageUrlEl = document.getElementById('landing-hero-image');
         imageUrlEl.src = "https://raw.githubusercontent.com/goldigger79/HaCeRaapp/main/image%201.png";
         imageUrlEl.onload = () => { imageUrlEl.classList.remove('opacity-0'); };
@@ -422,7 +647,7 @@
             <div class="font-extrabold text-5xl">HaCeRa</div>
             <div class="text-sm text-slate-500">Halal Certificate Readiness Assessment</div>
           </div>
-          <h2 class="text-4xl font-extrabold text-center text-slate-800">Welcome</h2>
+          <h2 class="text-4xl font-extrabold text-center text-slate-800">Client Login</h2>
           <p class="mt-2 text-center text-slate-600">Please log in or sign up to get started.</p>
           <div class="mt-8 w-full space-y-4">
             <div id="client-auth-form" class="space-y-4 p-4 border rounded-xl bg-slate-50">
@@ -444,17 +669,32 @@
                 Forgot password?
               </button>
             </div>
-            <button id="go-home-btn" class="w-full py-4 px-6 border border-slate-300 text-slate-800 rounded-full font-semibold hover:bg-slate-100 transition-colors transform hover:scale-105">
+            <a href="/index.html" class="block text-center w-full py-4 px-6 border border-slate-300 text-slate-800 rounded-full font-semibold hover:bg-slate-100 transition-colors transform hover:scale-105">
               Home
-            </button>
+            </a>
           </div>
         </div>
       `;
       document.getElementById('page-login').innerHTML = loginPageHtml;
       document.getElementById('client-login-btn').addEventListener('click', () => handleClientLogin('login'));
       document.getElementById('client-signup-btn').addEventListener('click', () => handleClientLogin('signup'));
+      
+      const handlePasswordReset = async () => {
+          const email = document.getElementById('client-email-input').value;
+          if (!email) {
+              showModal('Password Reset Failed', 'Please enter your email address to reset your password.');
+              return;
+          }
+          try {
+              await sendPasswordResetEmail(auth, email);
+              showModal('Password Reset Email Sent', `An email has been sent to ${email} with instructions to reset your password.`);
+          } catch (e) {
+              console.error("Password reset failed:", e);
+              showModal('Password Reset Failed', `An error occurred: ${e.message}`);
+          }
+      };
+      
       document.getElementById('forgot-password-btn').addEventListener('click', handlePasswordReset);
-      document.getElementById('go-home-btn').addEventListener('click', () => renderPage('landing'));
     }
     
     function getProgress() {
@@ -466,9 +706,7 @@
 
     function renderHomePage() {
       const progress = getProgress();
-      const text = isConsultant
-        ? "Business owners often find the Halal certification process to be complex and heavy on documentation. HaCeRa is designed to automate readiness checks, provide clear progress visualization, and give a powerful dashboard to track progress efficiently."
-        : "Navigating the Halal certification process can be complex. HaCeRa simplifies this by helping you track your readiness, visualize your progress, and manage all your documentation in one place. Your consultant can also view your progress, making collaboration easier than ever.";
+      const text = "Navigating the Halal certification process can be complex. HaCeRa simplifies this by helping you track your readiness, visualize your progress, and manage all your documentation in one place.";
       
       const missingRequired = checklist.filter(item => item.required && !item.done);
       const nextSteps = missingRequired.slice(0, 3);
@@ -565,7 +803,7 @@
       `;
       document.getElementById('page-home').innerHTML = homePageHtml;
       document.getElementById('start-btn').addEventListener('click', () => {
-        renderPage(isConsultant ? 'consultant' : 'checklist');
+        renderPage('checklist');
       });
     }
 
@@ -666,16 +904,12 @@
         </div>
       `;
       document.getElementById('page-checklist').innerHTML = checklistHtml;
+      
       document.querySelectorAll('.toggle-checkbox').forEach(cb => {
-        cb.addEventListener('change', () => toggleDone(parseInt(cb.dataset.id)));
-      });
-      document.querySelectorAll('.upload-input').forEach(input => {
-        input.addEventListener('change', (e) => handleUpload(parseInt(e.target.dataset.id), e.target.files));
+        cb.onclick = () => toggleDone(parseInt(cb.dataset.id), cb.checked);
       });
       document.querySelectorAll('.clarify-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          generateClarification(e.target.dataset.itemTitle);
-        });
+        btn.onclick = (e) => generateClarification(e.target.dataset.itemTitle);
       });
     }
 
@@ -729,13 +963,13 @@
       
       const inputs = ['companyName', 'companyType', 'contactName', 'contactEmail', 'contactPhone'];
       inputs.forEach(id => {
-          document.getElementById(id).addEventListener('input', (e) => {
+          document.getElementById(id).oninput = (e) => {
               const previewEl = document.getElementById(`preview-${id}`);
               if(previewEl) previewEl.innerText = e.target.value || 'N/A';
-          });
+          };
       });
 
-      document.getElementById('save-profile-btn').addEventListener('click', () => {
+      document.getElementById('save-profile-btn').onclick = () => {
         const newProfile = {
           companyName: document.getElementById('companyName').value,
           companyType: document.getElementById('companyType').value,
@@ -744,7 +978,22 @@
           contactPhone: document.getElementById('contactPhone').value
         };
         saveProfile(newProfile);
-      });
+      };
+    }
+
+    async function saveProfile(newProfile) {
+      try {
+        const updates = {
+          profile: newProfile,
+          updated: new Date().toLocaleString()
+        };
+        await setDoc(doc(db, PRIVATE_DATA_PATH(userId), 'profile'), updates, { merge: true });
+        await setDoc(doc(db, PUBLIC_DATA_PATH, userId), updates, { merge: true });
+        showModal('Profile Saved', 'Your company profile has been successfully updated.');
+      } catch (e) {
+        console.error("Error saving profile:", e);
+        showModal('Save Failed', `An error occurred while saving your profile: ${e.message}`);
+      }
     }
     
     function renderConsultantPage() {
@@ -752,13 +1001,14 @@
         <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-xl">
           <div class="flex justify-between items-center mb-6 flex-wrap gap-2">
             <h2 class="text-2xl font-semibold">Consultant Dashboard</h2>
-            <div class="text-sm text-slate-500">Manage clients & assessments</div>
+            <button id="reset-clients-btn" class="px-6 py-3 bg-rose-600 text-white rounded-lg font-medium hover:bg-rose-700 transition-colors duration-200">Reset Client List</button>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-left table-auto border-collapse">
               <thead>
                 <tr class="text-xs font-semibold text-slate-500 uppercase border-b border-slate-200">
-                  <th class="p-4">Client</th>
+                  <th class="p-4">Client ID</th>
+                  <th class="p-4">Client Name</th>
                   <th class="p-4">Type</th>
                   <th class="p-4">Status</th>
                   <th class="p-4">Progress</th>
@@ -767,7 +1017,7 @@
                 </tr>
               </thead>
               <tbody id="clients-table-body">
-                <tr><td colspan="6" class="p-4 text-center text-slate-500">Loading clients...</td></tr>
+                <tr><td colspan="7" class="p-4 text-center text-slate-500">Loading clients...</td></tr>
               </tbody>
             </table>
           </div>
@@ -775,27 +1025,9 @@
         </div>
       `;
       document.getElementById('page-consultant-dashboard').innerHTML = consultantHtml;
-      
-      const publicClientsCollectionRef = collection(db, PUBLIC_DATA_PATH);
-      if (unsubscribeConsultantListener) unsubscribeConsultantListener();
-      unsubscribeConsultantListener = onSnapshot(publicClientsCollectionRef, (querySnapshot) => {
-        clients = [];
-        querySnapshot.forEach(docSnap => {
-            const clientData = docSnap.data();
-            clients.push({
-              id: docSnap.id,
-              name: clientData.profile?.companyName || `Client ${docSnap.id.substring(0, 5)}`,
-              type: clientData.profile?.companyType || 'N/A',
-              status: clientData.progress === 100 ? 'Ready' : 'In progress',
-              progress: clientData.progress || 0,
-              updated: clientData.updated || 'N/A',
-              assessment: clientData.assessment || []
-            });
-        });
-        updateConsultantTable();
-      }, (error) => {
-        console.error("Error fetching client profiles:", error);
-        document.getElementById('clients-table-body').innerHTML = `<tr><td colspan="6" class="p-4 text-center text-rose-500">Failed to load clients. Permissions might be insufficient.</td></tr>`;
+      updateConsultantTable();
+      document.getElementById('reset-clients-btn').addEventListener('click', () => {
+          resetClientData();
       });
     }
 
@@ -805,6 +1037,7 @@
       
       const tableRows = clients.map(c => `
         <tr class="border-t border-slate-200 transition-all duration-200 hover:bg-slate-50">
+          <td class="p-4 text-sm font-mono text-slate-400">${c.id}</td>
           <td class="p-4 font-medium text-slate-800">${c.name}</td>
           <td class="p-4 text-sm text-slate-600">${c.type}</td>
           <td class="p-4">${c.status}</td>
@@ -813,18 +1046,26 @@
             <div class="w-full bg-slate-200 h-2 rounded-full mt-1"><div style="width: ${c.progress}%" class="h-full bg-gradient-to-r from-indigo-500 to-cyan-400"></div></div>
           </td>
           <td class="p-4 text-sm text-slate-500">${c.updated}</td>
-          <td class="p-4">
+          <td class="p-4 flex gap-2">
             <button class="open-client-btn px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-medium hover:bg-slate-100 transition-colors duration-200" data-id="${c.id}">Open</button>
+            <button class="delete-client-btn px-2 py-2 rounded-lg bg-rose-500 text-white hover:bg-rose-600 transition-colors duration-200" data-id="${c.id}">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+              </svg>
+            </button>
           </td>
         </tr>
       `).join('');
-      tableBody.innerHTML = tableRows || `<tr><td colspan="6" class="p-4 text-center text-slate-500">No clients found. Have a client log in to create a profile.</td></tr>`;
+      tableBody.innerHTML = tableRows || `<tr><td colspan="7" class="p-4 text-center text-slate-500">No clients found. Have a client log in to create a profile.</td></tr>`;
 
       document.querySelectorAll('.open-client-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.onclick = () => {
           selectedClientId = btn.dataset.id;
-          updateUI();
-        });
+          renderPage('client');
+        };
+      });
+      document.querySelectorAll('.delete-client-btn').forEach(btn => {
+        btn.onclick = () => deleteClientData(btn.dataset.id);
       });
     }
 
@@ -834,8 +1075,10 @@
           renderPage('consultant');
           return;
       }
+      
+      let clientAssessment = JSON.parse(JSON.stringify(client.assessment || []));
 
-      const assessmentHtml = client.assessment.map(it => `
+      const assessmentHtml = clientAssessment.map(it => `
         <div class="p-5 border border-slate-200 rounded-2xl bg-slate-50/50">
           <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between">
             <div class="flex items-start gap-4 flex-grow">
@@ -903,35 +1146,32 @@
       `;
       document.getElementById('page-consultant-client').innerHTML = clientProfileHtml;
 
-      document.getElementById('save-consultant-changes-btn').addEventListener('click', () => {
-        const currentClient = clients.find(c => c.id === selectedClientId);
-        if (!currentClient) return;
-
-        const updatedAssessment = currentClient.assessment.map(item => {
-          const checkbox = document.getElementById(`consultant-cb-${item.id}`);
-          const textarea = document.getElementById(`comment-ta-${item.id}`);
-          return {
-            ...item,
-            done: checkbox.checked,
-            comment: textarea.value
-          };
+      document.getElementById('save-consultant-changes-btn').onclick = async () => {
+        const updatedAssessment = clientAssessment.map(item => {
+            const checkbox = document.getElementById(`consultant-cb-${item.id}`);
+            const textarea = document.getElementById(`comment-ta-${item.id}`);
+            return {
+                ...item,
+                done: checkbox.checked,
+                comment: textarea.value
+            };
         });
 
         const updatedProgress = Math.round((updatedAssessment.filter(x => x.done).length / updatedAssessment.length) * 100);
-        saveConsultantAssessment(selectedClientId, {
-          assessment: updatedAssessment,
-          progress: updatedProgress,
-          updated: new Date().toLocaleString()
+        await saveConsultantAssessment(selectedClientId, {
+            assessment: updatedAssessment,
+            progress: updatedProgress,
+            updated: new Date().toLocaleString()
         });
-      });
+        showModal('Changes Saved', 'The client\'s assessment has been successfully updated.');
+      };
 
-
-      document.getElementById('generate-report-btn').addEventListener('click', () => {
-        generateReport(client.name, client.assessment);
-      });
-      document.getElementById('message-client-btn').addEventListener('click', () => {
+      document.getElementById('generate-report-btn').onclick = () => {
+        generateReport(client.name, clientAssessment);
+      };
+      document.getElementById('message-client-btn').onclick = () => {
         showModal('Message Sent', 'A notification has been sent to the client via email.');
-      });
+      };
     }
 
     async function saveConsultantAssessment(clientId, updates) {
@@ -939,244 +1179,82 @@
       try {
         const publicDocRef = doc(db, PUBLIC_DATA_PATH, clientId);
         await setDoc(publicDocRef, updates, { merge: true });
-        showModal('Changes Saved', 'The client\'s assessment has been successfully updated.');
+        
+        // Find the client's private document path to update it as well
+        const privateDocRef = doc(db, PRIVATE_DATA_PATH(clientId), 'profile');
+        const docSnap = await getDoc(privateDocRef);
+        if (docSnap.exists()) {
+          await setDoc(privateDocRef, updates, { merge: true });
+        } else {
+          // This case should not happen if the client created their profile.
+          console.warn("Private document not found, unable to save private changes.");
+        }
       } catch (e) {
         console.error("Error saving consultant changes:", e);
         showModal('Save Failed', `An error occurred while saving changes: ${e.message}`);
       }
     }
-
-
-    // Data persistence functions
-    async function saveAssessment() {
-      if (!userId || isConsultant) return;
-      try {
-        const privateDocRef = doc(db, PRIVATE_DATA_PATH(userId), 'profile');
-        const publicDocRef = doc(db, PUBLIC_DATA_PATH, userId);
-        const progress = Math.round((checklist.filter(x => x.done).length / checklist.length) * 100);
-        
-        await setDoc(privateDocRef, {
-          assessment: checklist,
-          progress,
-          updated: new Date().toLocaleString()
-        }, { merge: true });
-
-        // Update the public data for the consultant
-        await setDoc(publicDocRef, {
-          assessment: checklist,
-          progress,
-          updated: new Date().toLocaleString()
-        }, { merge: true });
-
-      } catch (e) {
-        console.error("Error saving assessment:", e);
-      }
-    }
-
-    async function saveProfile(newProfile) {
-      if (!userId || isConsultant) return;
-      try {
-        const privateDocRef = doc(db, PRIVATE_DATA_PATH(userId), 'profile');
-        const publicDocRef = doc(db, PUBLIC_DATA_PATH, userId);
-        
-        await setDoc(privateDocRef, {
-          profile: newProfile,
-          updated: new Date().toLocaleString()
-        }, { merge: true });
-        
-        await setDoc(publicDocRef, {
-            profile: newProfile,
-            updated: new Date().toLocaleString()
-        }, { merge: true });
-
-        showModal('Profile Saved', 'Your company profile has been successfully saved.');
-      } catch (e) {
-        console.error("Error saving profile:", e);
-        showModal('Save Failed', `An error occurred while saving your profile: ${e.message}`);
-      }
-    }
-
-    // Authentication functions
-    async function handleClientLogin(type) {
-      const email = document.getElementById('client-email-input').value;
-      const password = document.getElementById('client-password-input').value;
-
-      if (!email || !password) {
-        showModal('Login Failed', 'Please enter both email and password.');
-        return;
-      }
-
-      try {
-        if (type === 'signup') {
-          // Attempt to sign up
-          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-          const user = userCredential.user;
-          
-          await setDoc(doc(db, USERS_COLLECTION, user.uid), {
-            email: user.email,
-            role: 'client'
-          });
-          showModal('Sign Up Successful', 'Your account has been created. You can now log in.');
-
-        } else if (type === 'login') {
-          // Attempt to log in
-          await signInWithEmailAndPassword(auth, email, password);
-        }
-
-      } catch (error) {
-        let message = 'An unknown error occurred.';
-        if (error.code === 'auth/email-already-in-use') {
-            message = 'This email is already registered. Please log in instead.';
-        } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-            message = 'Invalid email or password. Please try again.';
-        } else if (error.code === 'auth/weak-password') {
-            message = 'The password is too weak. Please use at least 6 characters.';
-        } else if (error.code === 'auth/invalid-email') {
-            message = 'The email address is not valid.';
-        } else {
-            message = `Login failed: ${error.message}`;
-        }
-        console.error("Login failed:", error);
-        showModal('Login Failed', message);
-      }
-    }
-
-    async function handlePasswordReset() {
-      const email = document.getElementById('client-email-input').value;
-      if (!email) {
-        showModal('Forgot Password', 'Please enter your email address to reset your password.');
-        return;
-      }
-      try {
-        await sendPasswordResetEmail(auth, email);
-        showModal('Password Reset', `A password reset link has been sent to ${email}. Please check your inbox.`);
-      } catch (error) {
-        console.error("Password reset failed:", error);
-        showModal('Password Reset Failed', 'An error occurred while sending the password reset email. Please try again later.');
-      }
-    }
-
-    function handleLogout() {
-      signOut(auth);
-      selectedClientId = null;
-      updateUI();
-    }
-    document.getElementById('logout-button').addEventListener('click', handleLogout);
-
-    // File upload logic
-    async function handleUpload(itemId, files) {
-      if (files.length === 0) return;
-      const file = files[0];
-
-      // File size and type validation
-      const MAX_SIZE_MB = 5;
-      const allowedTypes = ['application/pdf', 'image/jpeg'];
-      if (!allowedTypes.includes(file.type)) {
-        showModal('Upload Failed', 'Unsupported file type. Please upload a PDF or JPEG file.');
-        return;
-      }
-      if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-        showModal('Upload Failed', `File size exceeds the ${MAX_SIZE_MB}MB limit.`);
-        return;
-      }
-
-      showModal('Uploading...', 'Please wait while your file is being uploaded.', true);
-      
-      const storageRef = ref(storage, `artifacts/${appId}/users/${userId}/documents/${itemId}-${file.name}`);
-      const uploadTask = uploadBytesResumable(storageRef, file);
-
-      uploadTask.on('state_changed', 
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          document.getElementById('upload-progress-bar').style.width = `${progress}%`;
-          document.getElementById('upload-progress-text').innerText = `${Math.round(progress)}%`;
-        }, 
-        (error) => {
-          console.error("Upload failed:", error);
-          showModal('Upload Failed', `An error occurred during upload: ${error.message}`);
-        }, 
-        async () => {
-          const fileUrl = await getDownloadURL(uploadTask.snapshot.ref);
-          const updatedChecklist = checklist.map(item => item.id === itemId ? { ...item, done: true, fileUrl: fileUrl } : item);
-          checklist = updatedChecklist;
-          await saveAssessment();
-          hideModal();
-          showModal('Upload Successful', 'The file has been uploaded and the item is marked as complete.');
-        }
-      );
-    }
     
-    // Gemini API integration
-    const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=";
-    const API_KEY = ""; // Leave this empty, Canvas will provide it
-    const GEMINI_API_IMAGE_URL = "https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=";
-
-    async function generateClarification(itemTitle) {
-      showModal('Generating Clarification', 'Please wait...', false);
-      try {
-        const systemPrompt = "You are a professional Halal consultant. Provide a concise, clear, and simple explanation of a checklist item for a small business owner. The explanation should be in a friendly, conversational tone.";
-        const userQuery = `Explain "${itemTitle}" from a Halal certification checklist.`;
-        
-        const payload = {
-            contents: [{ parts: [{ text: userQuery }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-        };
-
-        const response = await fetch(`${GEMINI_API_URL}${API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        const result = await response.json();
-        const generatedText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-        
-        if (generatedText) {
-          showModal('Clarification', generatedText);
-        } else {
-          showModal('Error', 'Failed to generate clarification. Please try again.');
-        }
-      } catch (e) {
-        console.error("Clarification failed:", e);
-        showModal('Error', `Failed to generate clarification: ${e.message}`);
-      }
-    }
-
     async function generateReport(clientName, assessment) {
-      showModal('Generating Report', 'Analyzing data and compiling report...', false);
+      const reportContentEl = document.getElementById('summary-report-content');
+      reportContentEl.innerHTML = '<div class="text-center text-indigo-500 font-medium animate-pulse">Generating report...</div>';
+
+      const completedItems = assessment.filter(item => item.done).map(item => item.title).join(', ');
+      const outstandingItems = assessment.filter(item => !item.done).map(item => item.title).join(', ');
+      const consultantComments = assessment.filter(item => item.comment).map(item => `${item.title}: "${item.comment}"`).join('; ');
+      const progress = Math.round((assessment.filter(x => x.done).length / assessment.length) * 100);
+      
+      const prompt = `Based on the following data for a Halal certification readiness assessment for client "${clientName}", generate a concise, encouraging, and professional summary report. Highlight their progress, mention the next key steps, and summarize any notable consultant comments.
+        - Overall progress: ${progress}%
+        - Completed items: ${completedItems || 'None'}
+        - Outstanding items: ${outstandingItems || 'None'}
+        - Consultant comments: ${consultantComments || 'None'}
+        
+        The summary should be formatted as a single paragraph.`;
+
+      const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=`;
+      const payload = {
+        contents: [{ parts: [{ text: prompt }] }],
+        systemInstruction: { parts: [{ text: "You are a professional Halal certification consultant. Provide a concise, single-paragraph summary of the key findings in a supportive and professional tone. The report should be easy to understand." }] },
+        tools: [{ "google_search": {} }]
+      };
+      
       try {
-        const systemPrompt = `You are a professional Halal consultant. Analyze the provided Halal certification checklist data for a client. Provide a concise, single-paragraph summary of their readiness. Highlight the percentage of completed items, mention key documents they have successfully prepared, and list any critical, required items that are still missing. The tone should be professional and encouraging.`;
-        const userQuery = `Generate a readiness report for client "${clientName}". Here is their checklist data in JSON format: ${JSON.stringify(assessment)}`;
-        
-        const payload = {
-            contents: [{ parts: [{ text: userQuery }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-        };
-
-        const response = await fetch(`${GEMINI_API_URL}${API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+        const response = await fetch(apiEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
         });
-
-        const result = await response.json();
-        const generatedText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
         
-        if (generatedText) {
-          document.getElementById('summary-report-content').innerText = generatedText;
-          showModal('Report Generated', 'The report has been successfully generated and added to the summary section.');
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || `API responded with status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (text) {
+          reportContentEl.innerText = text;
+          // You could also save this report text to Firestore
         } else {
-          showModal('Error', 'Failed to generate report. Please try again.');
+          throw new Error('No text generated.');
         }
       } catch (e) {
-        console.error("Report generation failed:", e);
-        showModal('Error', `Failed to generate report: ${e.message}`);
+        console.error("LLM call failed:", e);
+        reportContentEl.innerText = 'Failed to generate report. Please try again later.';
       }
     }
 
     // Initial page render
     window.onload = () => {
         updateUI();
+        document.addEventListener('change', (e) => {
+          if (e.target.classList.contains('upload-input')) {
+            const itemId = parseInt(e.target.dataset.id);
+            handleUpload(itemId, e.target.files);
+          }
+        });
     };
   </script>
 </body>
