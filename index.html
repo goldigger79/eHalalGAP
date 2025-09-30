@@ -238,7 +238,7 @@
                 checklist = SAMPLE_CHECKLIST;
                 selectedClientId = null;
                 if (unsubscribeClientListener) unsubscribeClientListener();
-                if (unsubscribeConsultantListener) unsubscribeConsultantListener();
+                if (unsubscribeConsultantListener) unsubscribeClientListener();
                 updateUI();
             }
         });
@@ -259,7 +259,7 @@
         if (userId) {
             navBar.classList.remove('hidden');
             if (isConsultant) {
-                // Sembunyikan navigasi klien di laman utama
+                // Sembunyikan navigasi klien di laman ini dan tunjukkan nav perunding
                 clientNav.classList.add('hidden');
                 consultantNav.classList.remove('hidden');
                 if (selectedClientId) navClientProfile.classList.remove('hidden');
@@ -307,7 +307,7 @@
         document.querySelectorAll('.page-container').forEach(el => el.classList.add('hidden'));
 
         if (userId && isConsultant) {
-          // Jika Perunding log masuk di laman klien ini, tunjukkan papan pemuka perunding (walaupun ini bukan admin.html)
+          // Jika Perunding log masuk di laman klien ini
           switch(pageName) {
             case 'home':
             case 'consultant':
@@ -443,7 +443,7 @@
     }
 
     async function saveProfile(newProfile) {
-      if (!userId || isConsultant) return;
+      if (!userId) return;
       try {
         const privateDocRef = doc(db, PRIVATE_DATA_PATH(userId), 'profile');
         const publicDocRef = doc(db, PUBLIC_DATA_PATH, userId);
@@ -514,7 +514,7 @@
       const fileExtension = file.name.split('.').pop();
       const storageRef = ref(storage, `uploads/${userId}/${id}_${Date.now()}.${fileExtension}`);
       
-      showModal('Memuat Naik...', `Memuat naik ${file.name}...`, true);
+      showModal('Memuatkan Dokumen...', `Memuat naik ${file.name}...`, true);
       
       try {
           const uploadTask = uploadBytesResumable(storageRef, file);
@@ -526,7 +526,7 @@
                   document.getElementById('upload-progress-text').innerText = `${Math.round(progress)}%`;
               }, 
               (error) => {
-                  console.error("Upload error:", error);
+                  console.error("Ralat muat naik:", error);
                   hideModal();
                   showModal('Muat Naik Gagal', `Ralat semasa memuat naik fail: ${error.message}`);
               }, 
@@ -543,7 +543,7 @@
           );
 
       } catch (e) {
-          console.error("Storage upload error:", e);
+          console.error("Ralat muat naik Storage:", e);
           hideModal();
           showModal('Muat Naik Gagal', `Ralat pemprosesan: ${e.message}`);
       }
@@ -571,13 +571,13 @@
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error?.message || `API call failed with status: ${response.status}`);
+                throw new Error(errorData.error?.message || `Panggilan API gagal dengan status: ${response.status}`);
             }
 
             const result = await response.json();
             return result.candidates?.[0]?.content?.parts?.[0]?.text || "Maaf, gagal menjana respons.";
         } catch (e) {
-            console.error("Gemini API Error:", e);
+            console.error("Ralat Gemini API:", e);
             return `Ralat AI: Gagal menghubungi perkhidmatan. (${e.message})`;
         }
     }
@@ -599,6 +599,7 @@
         const landingPageHtml = `
           <header class="w-full flex justify-between items-center py-4 px-6 fixed top-0 left-0 right-0 bg-white bg-opacity-80 backdrop-blur-md z-10">
             <div class="flex items-center space-x-2">
+                <img src="https://raw.githubusercontent.com/goldigger79/HaCeRaapp/main/image%202.png" alt="eHalalGAP Logo" class="h-10 w-auto mr-2"/>
                 <div class="font-bold text-xl text-slate-800">Aplikasi Web</div>
             </div>
             <nav class="flex space-x-4 items-center">
@@ -641,7 +642,7 @@
         });
         
         const imageUrlEl = document.getElementById('landing-hero-image');
-        imageUrlEl.src = "https://raw.githubusercontent.com/goldigger79/HaCeRaapp/main/image%201.png";
+        imageUrlEl.src = "https://raw.githubusercontent.com/goldigger79/HaCeRaapp/015f5410691909b7f7855a7e17605a47135f01aa/image%201.png";
         imageUrlEl.onload = () => { imageUrlEl.classList.remove('opacity-0'); };
         imageUrlEl.onerror = () => { imageUrlEl.src = "https://placehold.co/1200x800/e0f2fe/1e3a8a?text=Image+Failed+to+Load"; imageUrlEl.classList.remove('opacity-0'); };
     }
@@ -663,7 +664,7 @@
               </label>
               <label class="block">
                 <span class="text-sm font-medium text-slate-700">Kata Laluan</span>
-                <input type="password" id="client-password-input" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-ring-opacity-50" />
+                <input type="password" id="client-password-input" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" />
               </label>
               <button id="client-login-btn" class="w-full py-3 px-6 bg-indigo-600 text-white rounded-lg font-semibold shadow-lg hover:bg-indigo-700 transition-colors transform hover:scale-105">
                 Log Masuk
