@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ms">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HaCeRa: Halal Certificate Readiness App</title>
+  <title>eHalalGAP</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -20,17 +20,17 @@
     <div id="nav-bar" class="flex justify-between items-center mb-6 hidden">
       <div class="flex-grow"></div>
       <div class="flex items-center space-x-2 flex-wrap justify-end">
-        <button id="nav-home" class="nav-button px-2 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200">Home</button>
+        <button id="nav-home" class="nav-button px-2 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200">Utama</button>
         <div id="client-nav-buttons" class="hidden flex items-center space-x-2">
-          <button id="nav-checklist" class="nav-button px-2 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200">Checklist</button>
-          <button id="nav-profile" class="nav-button px-2 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200">My Profile</button>
+          <button id="nav-checklist" class="nav-button px-2 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200">Senarai Semak</button>
+          <button id="nav-profile" class="nav-button px-2 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200">Profil Saya</button>
         </div>
         <div id="consultant-nav-buttons" class="hidden flex items-center space-x-2">
-          <button id="nav-consultant-dashboard" class="nav-button px-2 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200">Dashboard</button>
-          <button id="nav-consultant-client" class="nav-button px-2 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200 hidden">Client Profile</button>
+          <button id="nav-consultant-dashboard" class="nav-button px-2 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200">Papan Pemuka</button>
+          <button id="nav-consultant-client" class="nav-button px-2 py-1 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors duration-200 text-slate-700 hover:bg-slate-200 hidden">Profil Klien</button>
         </div>
         <button id="logout-button" class="px-2 py-1 sm:px-4 sm:py-2 rounded-lg bg-rose-600 text-white font-medium hover:bg-rose-700 transition-colors duration-200">
-          Log Out
+          Log Keluar
         </button>
       </div>
     </div>
@@ -46,7 +46,7 @@
   </main>
 
   <footer class="mt-12 text-xs text-slate-500 text-center">
-    Copyright by ACE UniKL MICET 2025
+    Hak Cipta ACE UniKL MICET 2025
   </footer>
 
   <!-- Modal Structure -->
@@ -65,13 +65,20 @@
         <div class="w-full bg-slate-200 rounded-full h-2.5">
           <div id="upload-progress-bar" class="bg-indigo-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
         </div>
-        <div class="text-right text-xs text-slate-500 mt-1"><span id="upload-progress-text">0%</span> uploaded</div>
+        <div class="text-right text-xs text-slate-500 mt-1"><span id="upload-progress-text">0%</span> dimuat naik</div>
       </div>
       <div class="mt-8 text-right">
-        <button id="modal-ok-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors duration-200">Close</button>
+        <button id="modal-ok-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors duration-200">Tutup</button>
       </div>
     </div>
   </div>
+
+  <!-- Floating Facebook Button -->
+  <a href="https://www.facebook.com/p/ACE-UniKL-MICET-61554554881822/" target="_blank" rel="noopener noreferrer" class="fixed bottom-4 right-4 bg-[#1877f2] p-3 rounded-full shadow-lg hover:bg-[#156cd4] transition-all duration-300 transform hover:scale-110 z-20">
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white" class="w-6 h-6">
+          <path d="M12 2C6.477 2 2 6.477 2 12c0 5.016 3.657 9.128 8.438 9.878v-6.985H7.078v-2.893h1.36V9.43c0-1.353.818-2.109 2.196-2.109 1.02 0 1.93.076 2.18.109v2.54h-1.506c-.742 0-1.018.349-1.018.963v1.272h2.515l-.407 2.893H12.96V21.878C17.743 21.128 21.399 17.016 21.399 12 21.399 6.477 16.923 2 12 2z"/>
+      </svg>
+  </a>
   
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -95,8 +102,6 @@
     let app, auth, db, storage;
 
     // --- PASTE YOUR FIREBASE CONFIGURATION HERE ---
-    // You MUST replace this with your project's Firebase configuration.
-    // Get it from Firebase Console > Project settings.
     const firebaseConfig = {
       apiKey: "AIzaSyAiIniIt-7Kk1tB9F20l7qXLwAmKF07DSU",
       authDomain: "hecera-app.firebaseapp.com",
@@ -106,7 +111,7 @@
       appId: "1:951898649821:web:48eeeea0c51144963a9734",
       measurementId: "G-D3X4N3MKDD"
     };
-    const appId = firebaseConfig.projectId; // Or a custom ID if you prefer
+    const appId = firebaseConfig.projectId;
     
     // Initialize Firebase App, Auth, and Firestore instances once
     if (Object.keys(firebaseConfig).length > 0 && firebaseConfig.apiKey !== "YOUR_API_KEY") {
@@ -128,26 +133,26 @@
     const USERS_COLLECTION = `users`;
 
     const SAMPLE_CHECKLIST = [
-      { id: 1, category: 'Documentation', title: 'Company registration certificate (SSM)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/ssm.pdf', comment: '', fileUrl: '' },
-      { id: 2, category: 'Documentation', title: 'Business/manufacturing license', required: true, done: false, sampleLink: 'https://example.com/sample-docs/license.pdf', comment: '', fileUrl: '' },
-      { id: 3, category: 'Documentation', title: 'List of all products/services', required: true, done: false, sampleLink: 'https://example.com/sample-docs/products.pdf', comment: '', fileUrl: '' },
-      { id: 4, category: 'Documentation', title: 'Complete list of all ingredients', required: true, done: false, sampleLink: 'https://example.com/sample-docs/ingredients.pdf', comment: '', fileUrl: '' },
-      { id: 5, category: 'Documentation', title: 'Halal certificates for all ingredients', required: true, done: false, sampleLink: 'https://example.com/sample-docs/halal-certs.pdf', comment: '', fileUrl: '' },
-      { id: 6, category: 'Documentation', title: 'Ingredient specification sheets', required: false, done: false, sampleLink: 'https://example.com/sample-docs/specs.pdf', comment: '', fileUrl: '' },
-      { id: 7, category: 'Documentation', title: 'Process flow chart for each product', required: true, done: false, sampleLink: 'https://example.com/sample-docs/flow-chart.pdf', comment: '', fileUrl: '' },
-      { id: 8, category: 'Documentation', title: 'Factory layout plan and location map', required: true, done: false, sampleLink: 'https://example.com/sample-docs/layout.pdf', comment: '', fileUrl: '' },
-      { id: 9, category: 'Documentation', title: 'Photos of the manufacturing site', required: true, done: false, sampleLink: 'https://example.com/sample-docs/photos.pdf', comment: '', fileUrl: '' },
-      { id: 10, category: 'Documentation', title: 'Product packaging artwork and labels', required: true, done: false, sampleLink: 'https://example.com/sample-docs/labels.pdf', comment: '', fileUrl: '' },
-      { id: 11, category: 'Documentation', title: 'Other quality assurance certifications (HACCP, ISO, etc.)', required: false, done: false, sampleLink: 'https://example.com/sample-docs/certs.pdf', comment: '', fileUrl: '' },
-      { id: 12, category: 'Documentation', title: 'Proof of financial viability (annual turnover)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/turnover.pdf', comment: '', fileUrl: '' },
-      { id: 13, category: 'Operational', title: 'Separate Halal product processing', required: true, done: false, sampleLink: 'https://example.com/sample-docs/segregation-plan.pdf', comment: '', fileUrl: '' },
-      { id: 14, category: 'Operational', title: 'Equipment sanitation procedures', required: true, done: false, sampleLink: 'https://example.com/sample-docs/sanitation-sop.pdf', comment: '', fileUrl: '' },
-      { id: 15, category: 'Operational', title: 'Premise hygiene and sanitation (GMP/GHP)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/hygiene-plan.pdf', comment: '', fileUrl: '' },
-      { id: 16, category: 'Operational', title: 'Business has been operational for at least 3 months', required: true, done: false, sampleLink: 'https://example.com/sample-docs/3-months-operation.pdf', comment: '', fileUrl: '' },
-      { id: 17, category: 'Personnel', title: 'At least two full-time Muslim workers', required: true, done: false, sampleLink: 'https://example.com/sample-docs/employee-records.pdf', comment: '', fileUrl: '' },
-      { id: 18, category: 'Personnel', title: 'Certified Halal Executive (if applicable)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/halal-exec-cert.pdf', comment: '', fileUrl: '' },
-      { id: 19, category: 'Personnel', title: 'Halal Assurance System Manual', required: true, done: false, sampleLink: 'https://example.com/sample-docs/has-manual.pdf', comment: '', fileUrl: '' },
-      { id: 20, category: 'Personnel', title: 'Staff training on Halal principles', required: true, done: false, sampleLink: 'https://example.com/sample-docs/training-records.pdf', comment: '', fileUrl: '' }
+      { id: 1, category: 'Dokumentasi', title: 'Sijil pendaftaran syarikat (SSM)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/ssm.pdf', comment: '', fileUrl: '' },
+      { id: 2, category: 'Dokumentasi', title: 'Lesen perniagaan/pengilangan', required: true, done: false, sampleLink: 'https://example.com/sample-docs/license.pdf', comment: '', fileUrl: '' },
+      { id: 3, category: 'Dokumentasi', title: 'Senarai semua produk/perkhidmatan', required: true, done: false, sampleLink: 'https://example.com/sample-docs/products.pdf', comment: '', fileUrl: '' },
+      { id: 4, category: 'Dokumentasi', title: 'Senarai lengkap semua bahan mentah/ramuan', required: true, done: false, sampleLink: 'https://example.com/sample-docs/ingredients.pdf', comment: '', fileUrl: '' },
+      { id: 5, category: 'Dokumentasi', title: 'Sijil Halal untuk semua bahan mentah/ramuan', required: true, done: false, sampleLink: 'https://example.com/sample-docs/halal-certs.pdf', comment: '', fileUrl: '' },
+      { id: 6, category: 'Dokumentasi', title: 'Lembaran spesifikasi ramuan', required: false, done: false, sampleLink: 'https://example.com/sample-docs/specs.pdf', comment: '', fileUrl: '' },
+      { id: 7, category: 'Dokumentasi', title: 'Carta alir proses untuk setiap produk', required: true, done: false, sampleLink: 'https://example.com/sample-docs/flow-chart.pdf', comment: '', fileUrl: '' },
+      { id: 8, category: 'Dokumentasi', title: 'Pelan susun atur kilang dan peta lokasi', required: true, done: false, sampleLink: 'https://example.com/sample-docs/layout.pdf', comment: '', fileUrl: '' },
+      { id: 9, category: 'Dokumentasi', title: 'Gambar tapak pengilangan/premis', required: true, done: false, sampleLink: 'https://example.com/sample-docs/photos.pdf', comment: '', fileUrl: '' },
+      { id: 10, category: 'Dokumentasi', title: 'Reka bentuk bungkusan dan label produk', required: true, done: false, sampleLink: 'https://example.com/sample-docs/labels.pdf', comment: '', fileUrl: '' },
+      { id: 11, category: 'Dokumentasi', title: 'Pensijilan kualiti lain (HACCP, ISO, dll.)', required: false, done: false, sampleLink: 'https://example.com/sample-docs/certs.pdf', comment: '', fileUrl: '' },
+      { id: 12, category: 'Dokumentasi', title: 'Bukti daya maju kewangan (pusing ganti tahunan)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/turnover.pdf', comment: '', fileUrl: '' },
+      { id: 13, category: 'Operasi', title: 'Pengasingan produk Halal yang jelas', required: true, done: false, sampleLink: 'https://example.com/sample-docs/segregation-plan.pdf', comment: '', fileUrl: '' },
+      { id: 14, category: 'Operasi', title: 'Prosedur sanitasi peralatan', required: true, done: false, sampleLink: 'https://example.com/sample-docs/sanitation-sop.pdf', comment: '', fileUrl: '' },
+      { id: 15, category: 'Operasi', title: 'Kebersihan dan sanitasi premis (GMP/GHP)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/hygiene-plan.pdf', comment: '', fileUrl: '' },
+      { id: 16, category: 'Operasi', title: 'Perniagaan telah beroperasi sekurang-kurangnya 3 bulan', required: true, done: false, sampleLink: 'https://example.com/sample-docs/3-months-operation.pdf', comment: '', fileUrl: '' },
+      { id: 17, category: 'Personel', title: 'Sekurang-kurangnya dua pekerja Muslim sepenuh masa', required: true, done: false, sampleLink: 'https://example.com/sample-docs/employee-records.pdf', comment: '', fileUrl: '' },
+      { id: 18, category: 'Personel', title: 'Eksekutif Halal Bertauliah (jika berkenaan)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/halal-exec-cert.pdf', comment: '', fileUrl: '' },
+      { id: 19, category: 'Personel', title: 'Manual Sistem Jaminan Halal (HAS)', required: true, done: false, sampleLink: 'https://example.com/sample-docs/has-manual.pdf', comment: '', fileUrl: '' },
+      { id: 20, category: 'Personel', title: 'Rekod latihan kakitangan tentang prinsip Halal', required: true, done: false, sampleLink: 'https://example.com/sample-docs/training-records.pdf', comment: '', fileUrl: '' }
     ];
     
     // Auth state listener
@@ -161,7 +166,7 @@
                     const userDocSnap = await getDoc(userDocRef);
                     if (userDocSnap.exists()) {
                         const userRole = userDocSnap.data().role;
-                        isConsultant = (userRole === 'consultant');
+                        isConsultant = (userRole === 'consultant' || userRole === 'staff');
                     } else {
                         await setDoc(userDocRef, {
                             email: user.email,
@@ -198,6 +203,7 @@
                           }
                         });
                     } else {
+                        // Logic untuk Consultant/Staff: Hanya lihat klien di laman ini
                         if (unsubscribeConsultantListener) unsubscribeConsultantListener();
                         const publicClientsCollectionRef = collection(db, PUBLIC_DATA_PATH);
                         unsubscribeConsultantListener = onSnapshot(publicClientsCollectionRef, (querySnapshot) => {
@@ -206,24 +212,22 @@
                                 const clientData = docSnap.data();
                                 clients.push({
                                   id: docSnap.id,
-                                  name: clientData.profile?.companyName || `Client ${docSnap.id.substring(0, 5)}`,
-                                  type: clientData.profile?.companyType || 'N/A',
-                                  status: clientData.progress === 100 ? 'Ready' : 'In progress',
+                                  name: clientData.profile?.companyName || `Klien ${docSnap.id.substring(0, 5)}`,
+                                  type: clientData.profile?.companyType || 'T/A',
+                                  status: clientData.progress === 100 ? 'Sedia' : 'Dalam Proses',
                                   progress: clientData.progress || 0,
-                                  updated: clientData.updated || 'N/A',
+                                  updated: clientData.updated || 'T/A',
                                   assessment: clientData.assessment || []
                                 });
                             });
                             updateUI();
                         }, (error) => {
-                          console.error("Error fetching client profiles:", error);
-                          // This error is handled by a permission check on the page render
+                          console.error("Ralat memuatkan profil klien:", error);
                         });
                     }
                     
                 } catch (e) {
-                    console.error("Auth state change error:", e);
-                    // Handle specific errors like "permission-denied"
+                    console.error("Ralat pertukaran status Auth:", e);
                 }
 
                 updateUI();
@@ -254,11 +258,13 @@
         if (userId) {
             navBar.classList.remove('hidden');
             if (isConsultant) {
+                // Sembunyikan navigasi klien di laman utama
                 clientNav.classList.add('hidden');
                 consultantNav.classList.remove('hidden');
                 if (selectedClientId) navClientProfile.classList.remove('hidden');
                 else navClientProfile.classList.add('hidden');
             } else {
+                // Tunjukkan navigasi klien
                 clientNav.classList.remove('hidden');
                 consultantNav.classList.add('hidden');
             }
@@ -280,12 +286,16 @@
       document.getElementById('nav-profile').addEventListener('click', () => {
         renderPage('profile');
       });
-      document.getElementById('nav-consultant-dashboard').addEventListener('click', () => {
-        renderPage('consultant');
-      });
-      document.getElementById('nav-consultant-client').addEventListener('click', () => {
-        renderPage('client');
-      });
+      if (document.getElementById('nav-consultant-dashboard')) {
+        document.getElementById('nav-consultant-dashboard').addEventListener('click', () => {
+          renderPage('consultant');
+        });
+      }
+      if (document.getElementById('nav-consultant-client')) {
+        document.getElementById('nav-consultant-client').addEventListener('click', () => {
+          renderPage('client');
+        });
+      }
       document.getElementById('logout-button').addEventListener('click', async () => {
         await signOut(auth);
       });
@@ -296,6 +306,7 @@
         document.querySelectorAll('.page-container').forEach(el => el.classList.add('hidden'));
 
         if (userId && isConsultant) {
+          // Jika Perunding log masuk di laman klien ini, tunjukkan papan pemuka perunding (walaupun ini bukan admin.html)
           switch(pageName) {
             case 'home':
             case 'consultant':
@@ -312,6 +323,7 @@
               break;
           }
         } else if (userId && !isConsultant) {
+          // Logik untuk Klien
           switch(pageName) {
             case 'checklist':
               document.getElementById('page-checklist').classList.remove('hidden');
@@ -328,6 +340,7 @@
               break;
           }
         } else {
+          // Halaman Log Masuk / Pendaratan
           switch(pageName) {
             case 'login':
               document.getElementById('page-login').classList.remove('hidden');
@@ -380,7 +393,7 @@
       const password = document.getElementById('client-password-input').value;
 
       if (!email || !password) {
-        showModal('Login Failed', 'Please enter both email and password.');
+        showModal('Log Masuk Gagal', 'Sila masukkan e-mel dan kata laluan.');
         return;
       }
 
@@ -391,65 +404,217 @@
             email: auth.currentUser.email,
             role: 'client'
           });
-          showModal('Sign Up Successful', 'Your account has been created. You are now logged in.');
+          showModal('Pendaftaran Berjaya', 'Akaun anda telah berjaya dicipta. Anda kini log masuk.');
         } else {
           await signInWithEmailAndPassword(auth, email, password);
         }
       } catch (e) {
-        let errorMessage = 'An unexpected error occurred.';
+        let errorMessage = 'Ralat tidak dijangka berlaku.';
         if (e.code === 'auth/invalid-credential') {
-          errorMessage = 'Invalid email or password. Please check your credentials and try again.';
+          errorMessage = 'E-mel atau kata laluan tidak sah. Sila semak semula dan cuba lagi.';
         } else if (e.code === 'auth/email-already-in-use') {
-          errorMessage = 'This email is already in use. Please log in instead or use a different email.';
+          errorMessage = 'E-mel ini sudah digunakan. Sila log masuk atau guna e-mel lain.';
         } else {
-          errorMessage = `Login failed: ${e.message}`;
+          errorMessage = `Log masuk gagal: ${e.message}`;
         }
-        console.error("Login failed:", e);
-        showModal('Login Failed', errorMessage);
+        console.error("Ralat log masuk:", e);
+        showModal('Log Masuk Gagal', errorMessage);
       }
     }
 
     async function handlePasswordReset() {
         const email = document.getElementById('client-email-input').value;
         if (!email) {
-            showModal('Password Reset Failed', 'Please enter your email address to reset your password.');
+            showModal('Penetapan Semula Gagal', 'Sila masukkan alamat e-mel anda untuk menetapkan semula kata laluan.');
             return;
         }
         try {
             await sendPasswordResetEmail(auth, email);
-            showModal('Password Reset Email Sent', `An email has been sent to ${email} with instructions to reset your password.`);
+            showModal('E-mel Penetapan Semula Dihantar', `E-mel telah dihantar ke ${email} dengan arahan untuk menetapkan semula kata laluan anda.`);
         } catch (e) {
-            console.error("Password reset failed:", e);
-            showModal('Password Reset Failed', `An error occurred: ${e.message}`);
+            console.error("Ralat penetapan semula kata laluan:", e);
+            showModal('Penetapan Semula Gagal', `Ralat berlaku: ${e.message}`);
         }
     }
 
+    async function saveProfile(newProfile) {
+      if (!userId || isConsultant) return;
+      try {
+        const privateDocRef = doc(db, PRIVATE_DATA_PATH(userId), 'profile');
+        const publicDocRef = doc(db, PUBLIC_DATA_PATH, userId);
+        
+        await setDoc(privateDocRef, {
+          profile: newProfile,
+          updated: new Date().toLocaleString()
+        }, { merge: true });
+
+        await setDoc(publicDocRef, {
+          profile: newProfile,
+          updated: new Date().toLocaleString()
+        }, { merge: true });
+
+        showModal('Profil Disimpan', 'Profil syarikat anda telah berjaya disimpan.');
+      } catch (e) {
+        console.error("Ralat menyimpan profil:", e);
+        showModal('Gagal Menyimpan', `Ralat berlaku semasa menyimpan profil: ${e.message}`);
+      }
+    }
+
+    async function saveAssessment() {
+      if (!userId) return;
+      try {
+        const privateDocRef = doc(db, PRIVATE_DATA_PATH(userId), 'profile');
+        const publicDocRef = doc(db, PUBLIC_DATA_PATH, userId);
+        const progress = Math.round((checklist.filter(x => x.done).length / checklist.length) * 100);
+        
+        await setDoc(privateDocRef, {
+          assessment: checklist,
+          progress,
+          updated: new Date().toLocaleString()
+        }, { merge: true });
+
+        await setDoc(publicDocRef, {
+          assessment: checklist,
+          progress,
+          updated: new Date().toLocaleString()
+        }, { merge: true });
+
+      } catch (e) {
+        console.error("Ralat menyimpan penilaian:", e);
+        showModal('Gagal Menyimpan', `Ralat berlaku semasa menyimpan penilaian: ${e.message}`);
+      }
+    }
+
+    function toggleDone(id) {
+      checklist = checklist.map(it => it.id === id ? { ...it, done: !it.done } : it);
+      saveAssessment();
+    }
+
+    async function handleUpload(id, files) {
+      if (!files || files.length === 0) return;
+      const file = files[0];
+      
+      const MAX_SIZE_MB = 5;
+      const ALLOWED_TYPES = ['application/pdf', 'image/jpeg'];
+
+      if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+        showModal('Muat Naik Gagal', `Saiz fail melebihi ${MAX_SIZE_MB}MB. Sila muat naik fail yang lebih kecil.`);
+        return;
+      }
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        showModal('Muat Naik Gagal', 'Hanya format PDF dan JPEG (.jpg/.jpeg) dibenarkan.');
+        return;
+      }
+
+      const fileExtension = file.name.split('.').pop();
+      const storageRef = ref(storage, `uploads/${userId}/${id}_${Date.now()}.${fileExtension}`);
+      
+      showModal('Memuat Naik...', `Memuat naik ${file.name}...`, true);
+      
+      try {
+          const uploadTask = uploadBytesResumable(storageRef, file);
+          
+          uploadTask.on('state_changed', 
+              (snapshot) => {
+                  const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                  document.getElementById('upload-progress-bar').style.width = `${progress}%`;
+                  document.getElementById('upload-progress-text').innerText = `${Math.round(progress)}%`;
+              }, 
+              (error) => {
+                  console.error("Upload error:", error);
+                  hideModal();
+                  showModal('Muat Naik Gagal', `Ralat semasa memuat naik fail: ${error.message}`);
+              }, 
+              async () => {
+                  const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                  
+                  // Update checklist state with URL and mark as done
+                  checklist = checklist.map(it => it.id === id ? { ...it, done: true, fileUrl: downloadURL } : it);
+                  await saveAssessment();
+                  
+                  hideModal();
+                  showModal('Muat Naik Berjaya', 'Fail anda telah berjaya dimuat naik dan item ditanda sebagai selesai.');
+              }
+          );
+
+      } catch (e) {
+          console.error("Storage upload error:", e);
+          hideModal();
+          showModal('Muat Naik Gagal', `Ralat pemprosesan: ${e.message}`);
+      }
+    }
+
+    // Fungsi Gemini AI
+    async function callGeminiApi(systemPrompt, userQuery) {
+        const apiKey = ""; 
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+        const payload = {
+            contents: [{ parts: [{ text: userQuery }] }],
+            systemInstruction: {
+                parts: [{ text: systemPrompt }]
+            },
+        };
+        
+        let response;
+        try {
+            response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error?.message || `API call failed with status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            return result.candidates?.[0]?.content?.parts?.[0]?.text || "Maaf, gagal menjana respons.";
+        } catch (e) {
+            console.error("Gemini API Error:", e);
+            return `Ralat AI: Gagal menghubungi perkhidmatan. (${e.message})`;
+        }
+    }
+
+    async function generateClarification(itemTitle) {
+        showModal('Memuatkan Penjelasan...', 'Menjana penjelasan ringkas oleh pakar Halal AI...', true);
+
+        const systemPrompt = "Bertindak sebagai pakar pensijilan Halal JAKIM yang ramah dan berpengetahuan. Berikan penjelasan ringkas dan padat (maksimum 3 perenggan) dalam Bahasa Melayu mengenai mengapa item dokumen/proses ini diperlukan untuk permohonan Halal.";
+        const userQuery = `Terangkan kepentingan item senarai semak ini: "${itemTitle}".`;
+        
+        const explanation = await callGeminiApi(systemPrompt, userQuery);
+
+        hideModal();
+        showModal(`Penjelasan: ${itemTitle}`, explanation);
+    }
+    
     // Page rendering functions
     function renderLandingPage() {
         const landingPageHtml = `
           <header class="w-full flex justify-between items-center py-4 px-6 fixed top-0 left-0 right-0 bg-white bg-opacity-80 backdrop-blur-md z-10">
             <div class="flex items-center space-x-2">
-                <div class="font-bold text-xl text-slate-800">HaCeRa</div>
+                <div class="font-bold text-xl text-slate-800">Aplikasi Web</div>
             </div>
             <nav class="flex space-x-4 items-center">
-                <a href="#" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Features</a>
-                <a href="#" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Pricing</a>
-                <a href="#" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">About Us</a>
-                <a href="#" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Contact</a>
-                <button id="get-started-btn-header" class="px-4 py-2 bg-indigo-600 text-white rounded-full font-bold text-sm shadow-lg hover:bg-indigo-700 transition-colors transform hover:scale-105">Client Login</button>
+                <a href="#" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Ciri-ciri</a>
+                <a href="#" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Harga</a>
+                <a href="#" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Tentang Kami</a>
+                <a href="#" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Hubungi</a>
+                <button id="get-started-btn-header" class="px-4 py-2 bg-indigo-600 text-white rounded-full font-bold text-sm shadow-lg hover:bg-indigo-700 transition-colors transform hover:scale-105">Log Masuk Klien</button>
             </nav>
           </header>
           <div class="flex flex-col sm:flex-row items-center justify-center p-8 bg-white rounded-3xl shadow-2xl mt-24">
             <div class="flex flex-col items-start text-left w-full sm:w-1/2 p-4">
-                <div class="font-bold text-lg text-slate-500 mb-4">HaCeRa</div>
+                <div class="font-bold text-lg text-slate-500 mb-4">Aplikasi Web</div>
                 <h1 class="font-extrabold text-3xl sm:text-5xl lg:text-6xl text-slate-800 leading-tight">
-                    Halal Certificate <br class="hidden sm:block"> Readiness <br class="hidden sm:block"> Assessment
+                    Semakan Jurang Halal <br class="hidden sm:block"> (eHalalGAP)
                 </h1>
                 <p class="mt-4 text-sm sm:text-lg text-slate-600 max-w-sm">
-                    Towards Automation of the Halal Application Process
+                    Ke Arah Automasi Proses Permohonan Halal
                 </p>
                 <button id="get-started-btn-body" class="mt-8 px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">
-                    Get Started
+                    Mulakan Sekarang
                 </button>
             </div>
             <div class="relative w-full sm:w-1/2 p-4 flex items-center justify-center min-h-[300px] sm:min-h-[500px]">
@@ -476,33 +641,33 @@
       const loginPageHtml = `
         <div class="flex flex-col items-center justify-center p-8 bg-white rounded-3xl shadow-2xl max-w-lg mx-auto mt-20">
           <div class="flex flex-col items-center justify-center gap-4 mb-6 text-center">
-            <div class="font-extrabold text-5xl">HaCeRa</div>
-            <div class="text-sm text-slate-500">Halal Certificate Readiness Assessment</div>
+            <div class="font-extrabold text-5xl">eHalalGAP</div>
+            <div class="text-sm text-slate-500">Semakan Jurang Halal (eHalalGAP)</div>
           </div>
-          <h2 class="text-4xl font-extrabold text-center text-slate-800">Client Login</h2>
-          <p class="mt-2 text-center text-slate-600">Please log in or sign up to get started.</p>
+          <h2 class="text-4xl font-extrabold text-center text-slate-800">Log Masuk Klien</h2>
+          <p class="mt-2 text-center text-slate-600">Sila log masuk atau daftar untuk memulakan.</p>
           <div class="mt-8 w-full space-y-4">
             <div id="client-auth-form" class="space-y-4 p-4 border rounded-xl bg-slate-50">
               <label class="block">
-                <span class="text-sm font-medium text-slate-700">Email</span>
+                <span class="text-sm font-medium text-slate-700">E-mel</span>
                 <input type="email" id="client-email-input" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" />
               </label>
               <label class="block">
-                <span class="text-sm font-medium text-slate-700">Password</span>
+                <span class="text-sm font-medium text-slate-700">Kata Laluan</span>
                 <input type="password" id="client-password-input" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-ring-opacity-50" />
               </label>
               <button id="client-login-btn" class="w-full py-3 px-6 bg-indigo-600 text-white rounded-lg font-semibold shadow-lg hover:bg-indigo-700 transition-colors transform hover:scale-105">
-                Log In
+                Log Masuk
               </button>
               <button id="client-signup-btn" class="w-full py-3 px-6 border border-slate-300 text-slate-800 rounded-lg font-semibold hover:bg-slate-100 transition-colors transform hover:scale-105">
-                Sign Up
+                Daftar
               </button>
               <button id="forgot-password-btn" class="w-full text-sm text-indigo-500 hover:text-indigo-700 transition-colors duration-200 mt-2">
-                Forgot password?
+                Lupa kata laluan?
               </button>
             </div>
             <a href="/index.html" class="block text-center w-full py-4 px-6 border border-slate-300 text-slate-800 rounded-full font-semibold hover:bg-slate-100 transition-colors transform hover:scale-105">
-              Home
+              Utama
             </a>
           </div>
         </div>
@@ -522,13 +687,13 @@
 
     function renderHomePage() {
       const progress = getProgress();
-      const text = "Navigating the Halal certification process can be complex. HaCeRa simplifies this by helping you track your readiness, visualize your progress, and manage all your documentation in one place.";
+      const text = "Proses pensijilan Halal boleh menjadi rumit. e-HalalGAP memudahkannya dengan membantu anda menjejaki kesiapsiagaan, menggambarkan kemajuan, dan mengurus semua dokumentasi anda di satu tempat. Perunding anda juga boleh melihat kemajuan anda, menjadikan kerjasama lebih mudah berbanding sebelum ini.";
       
       const missingRequired = checklist.filter(item => item.required && !item.done);
       const nextSteps = missingRequired.slice(0, 3);
       
       const nextStepsHtml = nextSteps.length > 0 ? `
-        <h4 class="font-semibold text-lg text-slate-700 mt-8">Next Steps & Priorities</h4>
+        <h4 class="font-semibold text-lg text-slate-700 mt-8">Langkah Seterusnya & Keutamaan</h4>
         <ul class="mt-2 text-sm text-slate-600 space-y-2">
           ${nextSteps.map(item => `
             <li class="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center">
@@ -544,8 +709,8 @@
           <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-green-500" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
           </svg>
-          <p class="mt-2 text-lg font-semibold text-green-700">All required items are complete!</p>
-          <p class="text-sm">You are ready for the next step of the application process.</p>
+          <p class="mt-2 text-lg font-semibold text-green-700">Semua item wajib telah selesai!</p>
+          <p class="text-sm">Anda sedia untuk langkah seterusnya dalam proses permohonan.</p>
         </div>
       `;
       
@@ -557,15 +722,15 @@
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div class="bg-indigo-50 p-4 rounded-xl text-center">
               <div class="text-xl font-bold text-indigo-600">${documentsSubmitted}</div>
-              <div class="text-sm text-indigo-800">Documents Submitted</div>
+              <div class="text-sm text-indigo-800">Dokumen Dimuat Naik</div>
             </div>
             <div class="bg-rose-50 p-4 rounded-xl text-center">
               <div class="text-xl font-bold text-rose-600">${requiredItemsRemaining}</div>
-              <div class="text-sm text-rose-800">Required Remaining</div>
+              <div class="text-sm text-rose-800">Wajib Belum Selesai</div>
             </div>
             <div class="bg-cyan-50 p-4 rounded-xl text-center">
               <div class="text-xl font-bold text-cyan-600">${consultantComments}</div>
-              <div class="text-sm text-cyan-800">Consultant Comments</div>
+              <div class="text-sm text-cyan-800">Komen Perunding</div>
             </div>
           </div>
       `;
@@ -573,29 +738,29 @@
       const homePageHtml = `
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div class="md:col-span-2 bg-white p-6 sm:p-8 rounded-3xl shadow-xl">
-            <h2 class="text-2xl font-semibold text-slate-800">Why HaCeRa?</h2>
+            <h2 class="text-2xl font-semibold text-slate-800">Mengapa eHalalGAP?</h2>
             <p class="mt-4 text-slate-600">${text}</p>
             <div id="dynamic-dashboard-info" class="mt-6">
               ${kpiHtml}
             </div>
             <div class="mt-8 flex gap-4 flex-wrap">
-              <button id="start-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">Start Checklist</button>
-              <a class="px-6 py-3 border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-100 transition-colors duration-200" href="#sample-links">Sample documents</a>
+              <button id="start-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">Mulakan Senarai Semak</button>
+              <a class="px-6 py-3 border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-100 transition-colors duration-200" href="#sample-links">Contoh Dokumen</a>
             </div>
             <section class="mt-8" id="sample-links">
-              <h3 class="font-semibold text-lg">Sample documents</h3>
+              <h3 class="font-semibold text-lg">Contoh Dokumen</h3>
               <ul class="mt-3 text-sm text-slate-600 list-disc list-inside space-y-1">
-                <li><a class="underline text-indigo-500 hover:text-indigo-600" href="https://example.com/sample-docs/registration.pdf" target="_blank" rel="noreferrer">Company Registration & Business License (sample)</a></li>
-                <li><a class="underline text-indigo-500 hover:text-indigo-600" href="https://example.com/sample-docs/ingredients.pdf" target="_blank" rel="noreferrer">Ingredient Specifications (sample)</a></li>
-                <li><a class="underline text-indigo-500 hover:text-indigo-600" href="https://example.com/sample-docs/sop.pdf" target="_blank" rel="noreferrer">SOP for Halal Handling (sample)</a></li>
+                <li><a class="underline text-indigo-500 hover:text-indigo-600" href="https://example.com/sample-docs/registration.pdf" target="_blank" rel="noreferrer">Pendaftaran Syarikat & Lesen Perniagaan (contoh)</a></li>
+                <li><a class="underline text-indigo-500 hover:text-indigo-600" href="https://example.com/sample-docs/ingredients.pdf" target="_blank" rel="noreferrer">Spesifikasi Ramuan (contoh)</a></li>
+                <li><a class="underline text-indigo-500 hover:text-indigo-600" href="https://example.com/sample-docs/sop.pdf" target="_blank" rel="noreferrer">SOP Pengendalian Halal (contoh)</a></li>
               </ul>
             </section>
           </div>
           <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-xl flex flex-col justify-between">
             <div>
-              <h3 class="font-semibold text-lg">Current readiness</h3>
+              <h3 class="font-semibold text-lg">Kesiapsiagaan Semasa</h3>
               <div class="mt-4">
-                <div class="text-sm text-slate-500">Completed</div>
+                <div class="text-sm text-slate-500">Selesai</div>
                 <div class="mt-1 text-4xl font-bold text-center">${progress.done}/${progress.total}</div>
                 <div class="w-full max-w-[176px] h-44 mt-6 mx-auto">
                     <svg viewBox="0 0 100 100" class="w-full h-full">
@@ -607,11 +772,11 @@
               ${nextStepsHtml}
             </div>
             <div class="mt-8">
-              <h4 class="font-semibold text-lg text-slate-700">Quick Tips</h4>
+              <h4 class="font-semibold text-lg text-slate-700">Tip Pantas</h4>
               <ul class="mt-2 text-xs text-slate-600 list-disc list-inside space-y-1">
-                <li>Collect supplier declarations early.</li>
-                <li>Keep scanned copies of SOPs and training records.</li>
-                <li>Use HaCeRa to track progress and generate reports for your consultant.</li>
+                <li>Kumpul pengisytiharan pembekal awal.</li>
+                <li>Simpan salinan imbasan SOP dan rekod latihan.</li>
+                <li>Gunakan eHalalGAP untuk menjejaki kemajuan dan menjana laporan untuk perunding anda.</li>
               </ul>
             </div>
           </aside>
@@ -634,8 +799,8 @@
       const checklistHtml = `
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div class="lg:col-span-2 bg-white p-6 sm:p-8 rounded-3xl shadow-xl">
-            <h2 class="text-2xl font-semibold">Halal Certificate Checklist</h2>
-            <p class="mt-2 text-slate-500">Tick the items you have prepared or upload the required documents. Use sample links as references.</p>
+            <h2 class="text-2xl font-semibold">Senarai Semak Sijil Halal</h2>
+            <p class="mt-2 text-slate-500">Tandakan item yang telah anda sediakan atau muat naik dokumen yang diperlukan. Gunakan pautan contoh sebagai rujukan.</p>
             <div class="mt-6 space-y-6" id="checklist-items-container">
               ${Object.keys(byCategory).map(cat => `
                 <div class="p-5 border border-slate-200 rounded-2xl bg-slate-50/50">
@@ -648,16 +813,16 @@
                           <div class="flex-1">
                             <label for="cb-${item.id}" class="font-medium text-slate-800 cursor-pointer">${item.title}</label>
                             <div class="text-sm text-slate-500 mt-1">
-                              ${item.required ? 'Required' : 'Optional'}
+                              ${item.required ? 'Wajib' : 'Pilihan'}
                               <span class="mx-1">•</span>
-                              <a class="underline text-indigo-500 hover:text-indigo-600" href="${item.sampleLink}" target="_blank" rel="noreferrer">Sample</a>
+                              <a class="underline text-indigo-500 hover:text-indigo-600" href="${item.sampleLink}" target="_blank" rel="noreferrer">Contoh</a>
                               <button class="clarify-btn text-indigo-500 hover:text-indigo-600 ml-2" data-item-title="${item.title}">
-                                ✨ Get Clarification
+                                ✨ Terangkan
                               </button>
                             </div>
                             ${item.comment ? `
                               <div class="mt-3 p-3 rounded-lg bg-indigo-50 text-sm text-slate-700 border border-indigo-100">
-                                <span class="font-semibold text-indigo-800">Consultant Comment:</span> ${item.comment}
+                                <span class="font-semibold text-indigo-800">Komen Perunding:</span> ${item.comment}
                               </div>
                             ` : ''}
                           </div>
@@ -669,19 +834,19 @@
                               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
                               </svg>
-                              View Document
+                              Lihat Dokumen
                             </a>
                           ` : `
                             <div class="text-sm text-green-600 flex items-center gap-1 font-medium">
                               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
                               </svg>
-                              Completed
+                              Selesai
                             </div>
                           `}
                         ` : `
                           <label for="upload-input-${item.id}" class="px-4 py-2 bg-indigo-500 text-white rounded-lg text-sm font-medium hover:bg-indigo-600 transition-colors duration-200 transform hover:scale-105 cursor-pointer">
-                            Upload File
+                            Muat Naik Fail
                           </label>
                           <input type="file" id="upload-input-${item.id}" class="hidden upload-input" accept="application/pdf,image/jpeg" data-id="${item.id}" />
                         `}
@@ -693,13 +858,13 @@
               `).join('')}
             </div>
             <div class="mt-8 flex gap-4">
-              <button id="export-pdf-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">Export as PDF</button>
+              <button id="export-pdf-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">Eksport sebagai PDF</button>
             </div>
           </div>
           <aside class="bg-white p-6 sm:p-8 rounded-3xl shadow-xl flex flex-col items-center">
-            <h3 class="font-semibold text-lg">Readiness summary</h3>
+            <h3 class="font-semibold text-lg">Ringkasan Kesiapsiagaan</h3>
             <div class="mt-6 w-full flex-1">
-              <div class="text-sm text-slate-500">Progress</div>
+              <div class="text-sm text-slate-500">Kemajuan</div>
               <div class="mt-1 text-4xl font-bold text-center">${progress.percent}%</div>
               <div class="w-full max-w-[176px] h-44 mt-6 mx-auto">
                 <svg viewBox="0 0 100 100" class="w-full h-full">
@@ -709,11 +874,11 @@
               </div>
             </div>
             <div class="mt-8 w-full">
-              <h4 class="font-semibold text-lg text-slate-700">Quick tips</h4>
+              <h4 class="font-semibold text-lg text-slate-700">Tip Pantas</h4>
               <ul class="mt-2 text-xs text-slate-600 list-disc list-inside space-y-1">
-                <li>Collect supplier declarations early.</li>
-                <li>Keep scanned copies of SOPs and training records.</li>
-                <li>Use HaCeRa to track progress and generate reports for your consultant.</li>
+                <li>Kumpul pengisytiharan pembekal awal.</li>
+                <li>Simpan salinan imbasan SOP dan rekod latihan.</li>
+                <li>Gunakan eHalalGAP untuk menjejaki kemajuan dan menjana laporan untuk perunding anda.</li>
               </ul>
             </div>
           </aside>
@@ -738,43 +903,43 @@
       const profileHtml = `
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-xl">
-            <h2 class="text-2xl font-semibold">My Company Profile</h2>
-            <p class="mt-2 text-slate-500">Fill in your company details to help your consultant.</p>
+            <h2 class="text-2xl font-semibold">Profil Syarikat Saya</h2>
+            <p class="mt-2 text-slate-500">Isi butiran syarikat anda untuk membantu perunding anda.</p>
             <div class="mt-6 space-y-4">
               <label class="block">
-                <span class="text-sm font-medium text-slate-700">Company Name</span>
+                <span class="text-sm font-medium text-slate-700">Nama Syarikat</span>
                 <input type="text" id="companyName" value="${profile.companyName || ''}" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 transition-colors duration-200" />
               </label>
               <label class="block">
-                <span class="text-sm font-medium text-slate-700">Company Type</span>
+                <span class="text-sm font-medium text-slate-700">Jenis Syarikat</span>
                 <input type="text" id="companyType" value="${profile.companyType || ''}" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-ring-indigo-200 focus:ring-opacity-50 transition-colors duration-200" />
               </label>
               <label class="block">
-                <span class="text-sm font-medium text-slate-700">Contact Person</span>
+                <span class="text-sm font-medium text-slate-700">Orang Hubungan</span>
                 <input type="text" id="contactName" value="${profile.contactName || ''}" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 transition-colors duration-200" />
               </label>
               <label class="block">
-                <span class="text-sm font-medium text-slate-700">Contact Email</span>
+                <span class="text-sm font-medium text-slate-700">E-mel Hubungan</span>
                 <input type="email" id="contactEmail" value="${profile.contactEmail || ''}" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 transition-colors duration-200" />
               </label>
               <label class="block">
-                <span class="text-sm font-medium text-slate-700">Contact Phone</span>
+                <span class="text-sm font-medium text-slate-700">Telefon Hubungan</span>
                 <input type="tel" id="contactPhone" value="${profile.contactPhone || ''}" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 transition-colors duration-200" />
               </label>
             </div>
             <div class="mt-8">
-              <button id="save-profile-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200 transform hover:scale-105">Save Profile</button>
+              <button id="save-profile-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200 transform hover:scale-105">Simpan Profil</button>
             </div>
           </div>
           <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-xl">
-            <h3 class="text-2xl font-semibold">Profile Preview</h3>
+            <h3 class="text-2xl font-semibold">Pratonton Profil</h3>
             <div class="mt-4 p-6 border border-slate-200 rounded-xl">
-              <div id="preview-companyName" class="text-xl font-medium">${profile.companyName || 'Your Company Name'}</div>
-              <div id="preview-companyType" class="text-sm text-slate-500">${profile.companyType || 'Company Type'}</div>
-              <div class="mt-6 text-sm text-slate-500 font-medium">Contact Person</div>
-              <div id="preview-contactName" class="text-lg font-medium text-slate-800">${profile.contactName || 'N/A'}</div>
-              <div id="preview-contactEmail" class="text-sm text-indigo-600 font-medium">${profile.contactEmail || 'N/A'}</div>
-              <div id="preview-contactPhone" class="text-sm text-slate-600 font-medium">${profile.contactPhone || 'N/A'}</div>
+              <div id="preview-companyName" class="text-xl font-medium">${profile.companyName || 'Nama Syarikat Anda'}</div>
+              <div id="preview-companyType" class="text-sm text-slate-500">${profile.companyType || 'Jenis Syarikat'}</div>
+              <div class="mt-6 text-sm text-slate-500 font-medium">Orang Hubungan</div>
+              <div id="preview-contactName" class="text-lg font-medium text-slate-800">${profile.contactName || 'T/A'}</div>
+              <div id="preview-contactEmail" class="text-sm text-indigo-600 font-medium">${profile.contactEmail || 'T/A'}</div>
+              <div id="preview-contactPhone" class="text-sm text-slate-600 font-medium">${profile.contactPhone || 'T/A'}</div>
             </div>
           </div>
         </div>
@@ -785,7 +950,7 @@
       inputs.forEach(id => {
           document.getElementById(id).addEventListener('input', (e) => {
               const previewEl = document.getElementById(`preview-${id}`);
-              if(previewEl) previewEl.innerText = e.target.value || 'N/A';
+              if(previewEl) previewEl.innerText = e.target.value || 'T/A';
           });
       });
 
@@ -805,52 +970,33 @@
       const consultantHtml = `
         <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-xl">
           <div class="flex justify-between items-center mb-6 flex-wrap gap-2">
-            <h2 class="text-2xl font-semibold">Consultant Dashboard</h2>
-            <div class="text-sm text-slate-500">Manage clients & assessments</div>
+            <h2 class="text-2xl font-semibold">Papan Pemuka Perunding</h2>
+            <div class="text-sm text-slate-500">Urus klien & penilaian</div>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-left table-auto border-collapse">
               <thead>
                 <tr class="text-xs font-semibold text-slate-500 uppercase border-b border-slate-200">
-                  <th class="p-4">Client</th>
-                  <th class="p-4">Type</th>
+                  <th class="p-4">Klien</th>
+                  <th class="p-4">Jenis</th>
                   <th class="p-4">Status</th>
-                  <th class="p-4">Progress</th>
-                  <th class="p-4">Last update</th>
-                  <th class="p-4">Action</th>
+                  <th class="p-4">Kemajuan</th>
+                  <th class="p-4">Kemas kini terakhir</th>
+                  <th class="p-4">Tindakan</th>
                 </tr>
               </thead>
               <tbody id="clients-table-body">
-                <tr><td colspan="6" class="p-4 text-center text-slate-500">Loading clients...</td></tr>
+                <tr><td colspan="6" class="p-4 text-center text-slate-500">Memuatkan klien...</td></tr>
               </tbody>
             </table>
           </div>
-          <div class="mt-6 text-xs text-slate-500">Tip: Click a client to open their profile, review assessments, and generate a readiness report.</div>
+          <div class="mt-6 text-xs text-slate-500">Petua: Klik klien untuk membuka profil, semak penilaian, dan menjana laporan kesiapsiagaan.</div>
         </div>
       `;
       document.getElementById('page-consultant-dashboard').innerHTML = consultantHtml;
       
-      const publicClientsCollectionRef = collection(db, PUBLIC_DATA_PATH);
-      if (unsubscribeConsultantListener) unsubscribeConsultantListener();
-      unsubscribeConsultantListener = onSnapshot(publicClientsCollectionRef, (querySnapshot) => {
-        clients = [];
-        querySnapshot.forEach(docSnap => {
-            const clientData = docSnap.data();
-            clients.push({
-              id: docSnap.id,
-              name: clientData.profile?.companyName || `Client ${docSnap.id.substring(0, 5)}`,
-              type: clientData.profile?.companyType || 'N/A',
-              status: clientData.progress === 100 ? 'Ready' : 'In progress',
-              progress: clientData.progress || 0,
-              updated: clientData.updated || 'N/A',
-              assessment: clientData.assessment || []
-            });
-        });
-        updateConsultantTable();
-      }, (error) => {
-        console.error("Error fetching client profiles:", error);
-        document.getElementById('clients-table-body').innerHTML = `<tr><td colspan="6" class="p-4 text-center text-rose-500">Failed to load clients. Permissions might be insufficient.</td></tr>`;
-      });
+      // Data untuk Perunding dimuatkan dalam onAuthStateChanged/updateUI
+      updateConsultantTable();
     }
 
     function updateConsultantTable() {
@@ -868,16 +1014,16 @@
           </td>
           <td class="p-4 text-sm text-slate-500">${c.updated}</td>
           <td class="p-4">
-            <button class="open-client-btn px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-medium hover:bg-slate-100 transition-colors duration-200" data-id="${c.id}">Open</button>
+            <button class="open-client-btn px-4 py-2 rounded-lg border border-slate-300 text-slate-700 font-medium hover:bg-slate-100 transition-colors duration-200" data-id="${c.id}">Buka</button>
           </td>
         </tr>
       `).join('');
-      tableBody.innerHTML = tableRows || `<tr><td colspan="6" class="p-4 text-center text-slate-500">No clients found. Have a client log in to create a profile.</td></tr>`;
+      tableBody.innerHTML = tableRows || `<tr><td colspan="6" class="p-4 text-center text-slate-500">Tiada klien ditemui. Sila minta klien log masuk untuk mencipta profil.</td></tr>`;
 
       document.querySelectorAll('.open-client-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           selectedClientId = btn.dataset.id;
-          updateUI();
+          renderPage('client');
         });
       });
     }
@@ -900,24 +1046,24 @@
                   ${it.category}
                   <span class="mx-1">•</span>
                   ${it.fileUrl ? `
-                    <a href="${it.fileUrl}" target="_blank" rel="noopener noreferrer" class="underline text-indigo-500 hover:text-indigo-600">View File</a>
+                    <a href="${it.fileUrl}" target="_blank" rel="noopener noreferrer" class="underline text-indigo-500 hover:text-indigo-600">Lihat Fail</a>
                   ` : `
-                    <a class="underline text-indigo-500 hover:text-indigo-600" href="${it.sampleLink}" target="_blank" rel="noreferrer">Sample</a>
+                    <a class="underline text-indigo-500 hover:text-indigo-600" href="${it.sampleLink}" target="_blank" rel="noreferrer">Contoh</a>
                   `}
                 </div>
               </div>
             </div>
-            <div class="mt-2 sm:mt-0 text-xs text-slate-400 font-medium flex-shrink-0">${it.required ? 'Required' : 'Optional'}</div>
+            <div class="mt-2 sm:mt-0 text-xs text-slate-400 font-medium flex-shrink-0">${it.required ? 'Wajib' : 'Pilihan'}</div>
           </div>
           <div class="mt-4">
             <label class="block text-sm font-medium text-slate-700">
-              Consultant Comment:
+              Komen Perunding:
               <textarea
                 id="comment-ta-${it.id}"
                 data-id="${it.id}"
                 rows="2"
                 class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 transition-colors duration-200 consultant-comment"
-                placeholder="Add comments for the client..."
+                placeholder="Tambah komen untuk klien..."
               >${it.comment || ''}</textarea>
             </label>
           </div>
@@ -933,25 +1079,25 @@
                 <div class="text-sm text-slate-500">${client.type} • ${client.status}</div>
               </div>
               <div class="text-right mt-4 sm:mt-0">
-                <div class="text-sm text-slate-500">Progress</div>
+                <div class="text-sm text-slate-500">Kemajuan</div>
                 <div class="text-4xl font-bold">${client.progress}%</div>
               </div>
             </div>
             <div class="mt-6">
-              <h3 class="font-semibold text-lg">Assessment items</h3>
+              <h3 class="font-semibold text-lg">Item Penilaian</h3>
               <div class="mt-4 space-y-4">
                 ${assessmentHtml}
               </div>
             </div>
             <div class="mt-8 flex gap-4 flex-wrap">
-              <button id="save-consultant-changes-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">Save Changes</button>
-              <button id="generate-report-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">✨ Generate Report</button>
-              <button id="message-client-btn" class="px-6 py-3 border border-slate-300 rounded-lg font-medium hover:bg-slate-100 transition-colors duration-200">Message client</button>
+              <button id="save-consultant-changes-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">Simpan Perubahan</button>
+              <button id="generate-report-btn" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium shadow-md hover:bg-indigo-700 transition-colors duration-200">✨ Jana Laporan</button>
+              <button id="message-client-btn" class="px-6 py-3 border border-slate-300 rounded-lg font-medium hover:bg-slate-100 transition-colors duration-200">Mesej Klien</button>
             </div>
           </div>
           <aside class="bg-white p-6 sm:p-8 rounded-3xl shadow-xl">
-            <h3 class="font-semibold text-lg">Summary</h3>
-            <div id="summary-report-content" class="mt-4 text-sm text-slate-600">${client.notes || 'Click "Generate Report" to get an AI-powered summary of the client\'s progress.'}</div>
+            <h3 class="font-semibold text-lg">Ringkasan</h3>
+            <div id="summary-report-content" class="mt-4 text-sm text-slate-600">${client.notes || 'Klik "Jana Laporan" untuk mendapatkan ringkasan kemajuan klien berpandukan AI.'}</div>
           </aside>
         </div>
       `;
@@ -1012,7 +1158,7 @@
             progress: updatedProgress,
             updated: new Date().toLocaleString()
         });
-        showModal('Changes Saved', 'The client\'s assessment has been successfully updated.');
+        showModal('Perubahan Disimpan', 'Penilaian klien telah berjaya dikemas kini.');
       });
 
 
@@ -1020,55 +1166,20 @@
         generateReport(client.name, client.assessment);
       });
       document.getElementById('message-client-btn').addEventListener('click', () => {
-        showModal('Message Sent', 'A notification has been sent to the client via email.');
+        showModal('Mesej Dihantar', 'Notifikasi telah dihantar kepada klien melalui e-mel.');
       });
     }
     
-    async function handleAdminLogin() {
-      const email = document.getElementById('consultant-email-input').value;
-      const password = document.getElementById('consultant-password-input').value;
-      if (!email || !password) {
-          showModal('Login Failed', 'Please enter both email and password.');
-          return;
-      }
-
-      try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-        const userDocRef = doc(db, USERS_COLLECTION, user.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        
-        if (userDocSnap.exists() && userDocSnap.data().role === 'consultant') {
-          // Success, onAuthStateChanged will handle the rest
-        } else {
-          // Not a consultant, log out for security
-          await signOut(auth);
-          showModal('Access Denied', 'This account is not authorized as a consultant.');
-        }
-      } catch (error) {
-        let message = 'An unknown error occurred.';
-        if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-            message = 'Invalid email or password. Please try again.';
-        } else {
-            message = `Login failed: ${error.message}`;
-        }
-        console.error("Consultant login failed:", error);
-        showModal('Login Failed', message);
-      }
-    }
-
-
     async function saveConsultantAssessment(clientId, updates) {
       try {
         const publicDocRef = doc(db, PUBLIC_DATA_PATH, clientId);
         await setDoc(publicDocRef, updates, { merge: true });
         // The UI will be updated by the snapshot listener, so no modal needed here
       } catch (e) {
-        console.error("Error saving consultant changes:", e);
-        showModal('Save Failed', `An error occurred while saving changes: ${e.message}`);
+        console.error("Ralat menyimpan perubahan perunding:", e);
+        showModal('Gagal Menyimpan', `Ralat berlaku semasa menyimpan perubahan: ${e.message}`);
       }
     }
-
 
     // Initial page render
     window.onload = () => {
