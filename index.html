@@ -43,6 +43,7 @@
     <div id="page-profile" class="page-container hidden"></div>
     <div id="page-consultant-dashboard" class="page-container hidden"></div>
     <div id="page-consultant-client" class="page-container hidden"></div>
+    <div id="page-contact" class="page-container hidden"></div>
   </main>
 
   <footer class="mt-12 text-xs text-slate-500 text-center">
@@ -346,6 +347,10 @@
               document.getElementById('page-login').classList.remove('hidden');
               renderLoginPage();
               break;
+            case 'contact':
+              document.getElementById('page-contact').classList.remove('hidden');
+              renderContactPage();
+              break;
             case 'landing':
             default:
               document.getElementById('page-landing').classList.remove('hidden');
@@ -600,7 +605,7 @@
                 <a href="#" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Ciri-ciri</a>
                 <a href="#" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Harga</a>
                 <a href="#" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Tentang Kami</a>
-                <a href="#" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Hubungi</a>
+                <button id="nav-contact-btn" class="hidden md:block text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors">Hubungi</button>
                 <button id="get-started-btn-header" class="px-4 py-2 bg-indigo-600 text-white rounded-full font-bold text-sm shadow-lg hover:bg-indigo-700 transition-colors transform hover:scale-105">Log Masuk Klien</button>
             </nav>
           </header>
@@ -629,6 +634,10 @@
         });
         document.getElementById('get-started-btn-header').addEventListener('click', () => {
           renderPage('login');
+        });
+        // Listener for the new 'Hubungi' button
+        document.getElementById('nav-contact-btn').addEventListener('click', () => {
+            renderPage('contact');
         });
         
         const imageUrlEl = document.getElementById('landing-hero-image');
@@ -1179,6 +1188,68 @@
         console.error("Ralat menyimpan perubahan perunding:", e);
         showModal('Gagal Menyimpan', `Ralat berlaku semasa menyimpan perubahan: ${e.message}`);
       }
+    }
+
+    function renderContactPage() {
+        const contactHtml = `
+            <div class="bg-white p-8 rounded-3xl shadow-xl max-w-3xl mx-auto mt-12">
+                <h2 class="text-3xl font-bold text-indigo-700 mb-6">Hubungi Kami</h2>
+                <p class="text-slate-600 mb-8">
+                    Jika anda mempunyai sebarang pertanyaan mengenai eHalalGAP, proses permohonan Halal, atau memerlukan sokongan teknikal, sila hubungi kami melalui maklumat di bawah.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Maklumat Hubungan -->
+                    <div>
+                        <h3 class="text-xl font-semibold text-slate-800 mb-4">Maklumat Penting</h3>
+                        
+                        <div class="space-y-4">
+                            <div class="flex items-start">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-500 mr-3 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26c.71.47 1.61.47 2.32 0L21 8m-9 13V5"/></svg>
+                                <div>
+                                    <p class="font-medium">E-mel Sokongan</p>
+                                    <a href="mailto:support@unikl.edu.my" class="text-indigo-600 hover:underline">support@unikl.edu.my</a>
+                                </div>
+                            </div>
+
+                            <div class="flex items-start">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-500 mr-3 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.586a1 1 0 01.707.293l4.828 4.828a1 1 0 01.293.707V19a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>
+                                <div>
+                                    <p class="font-medium">Telefon Pejabat</p>
+                                    <p class="text-slate-600">+60 6-555-1234</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Lokasi -->
+                    <div>
+                        <h3 class="text-xl font-semibold text-slate-800 mb-4">Alamat Kami</h3>
+                        <p class="text-slate-600">
+                            Pusat Kecemerlangan Halal (ACE UniKL MICET)<br>
+                            Universiti Kuala Lumpur Malaysia Institute of Chemical and Bioengineering Technology<br>
+                            Kawasan Perindustrian Bandar Vendor<br>
+                            78000 Alor Gajah, Melaka
+                        </p>
+                        <a href="https://maps.app.goo.gl/YourUniKLMapLink" target="_blank" class="mt-4 inline-block text-indigo-600 font-medium hover:underline">
+                            Lihat di Google Maps
+                        </a>
+                    </div>
+                </div>
+
+                <div class="mt-10 pt-6 border-t border-slate-200">
+                    <h3 class="text-xl font-semibold text-slate-800 mb-4">Ikuti Kami</h3>
+                    <a href="https://www.facebook.com/p/ACE-UniKL-MICET-61554554881822/" target="_blank" class="flex items-center text-indigo-600 hover:text-indigo-700 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 mr-2">
+                            <path d="M12 2C6.477 2 2 6.477 2 12c0 5.016 3.657 9.128 8.438 9.878v-6.985H7.078v-2.893h1.36V9.43c0-1.353.818-2.109 2.196-2.109 1.02 0 1.93.076 2.18.109v2.54h-1.506c-.742 0-1.018.349-1.018.963v1.272h2.515l-.407 2.893H12.96V21.878C17.743 21.128 21.399 17.016 21.399 12 21.399 6.477 16.923 2 12 2z"/>
+                        </svg>
+                        ACE UniKL MICET (Facebook)
+                    </a>
+                </div>
+
+            </div>
+        `;
+        document.getElementById('page-contact').innerHTML = contactHtml;
     }
 
     // Initial page render
