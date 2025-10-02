@@ -114,7 +114,6 @@
             authDomain: "ehalalgap.firebaseapp.com",
             projectId: "ehalalgap",
             storageBucket: "ehalalgap.firebasestorage.app",
-            messagingSenderId: "687151615169",
             appId: "1:687151615169:web:8ff94f1eed2c6d1d5f1840",
             measurementId: "G-6QBXVD6R0R"
         };
@@ -294,8 +293,9 @@
                 
                 await setDoc(docRef, summaryData, { merge: true });
             } catch (error) {
-                console.error("Error saving public summary:", error);
-                // NOTE: If this fails, it is usually a Security Rules issue (e.g., lack of 'create' permission).
+                // LOG: Adding userId to log the context of the permission error
+                console.error("Error saving public summary for client", userId, ":", error); 
+                // The error indicates insufficient permissions (Security Rules Issue)
             }
         };
 
@@ -322,10 +322,10 @@
                     
                     // Use setTimeout to defer Firestore writing slightly, minimizing potential stack exhaustion
                     setTimeout(async () => {
-                        // 1. Save Private Data
+                        // 1. Save Private Data (Permitted by Peraturan 1)
                         await setDoc(privateDocRef, dataToSave, { merge: true });
                         
-                        // 2. Save Public Summary for Consultant View
+                        // 2. Save Public Summary for Consultant View (Permitted by Peraturan 2)
                         await savePublicSummary(window.appState.userId, dataToSave, score);
 
                     }, 0);
@@ -580,7 +580,9 @@
             const answers = window.appState.answers;
             
             for (const fieldId of requiredFields) {
-                if (!answers[fieldId] || answers[fieldId].trim() === '') {
+                const value = answers[fieldId];
+                // Check if value is null/undefined OR if it's an empty string or only whitespace
+                if (!value || String(value).trim() === '') { 
                     return false;
                 }
             }
@@ -1055,8 +1057,6 @@
                     `;
                 });
                 html += '</div>';
-
-                // Validation logic display removed as per user request.
                 
             } else if (step.type === 'selection') {
                 // --- Kategori Industri & Skim Pensijilan (Radio Buttons) ---
@@ -1077,32 +1077,12 @@
                     `;
                 });
                 html += '</div>';
-
-                // --- VALIDATION LOGIC for Selection (Kategori/Skim) ---
-                if (step.id === 'kategori' || step.id === 'skim') {
-                    const selectionMade = window.isSelectionMade(step.id);
-                    const isSelectionType = step.id === 'kategori' ? 'Kategori Industri' : 'Skim Pensijilan';
-
-                    if (!selectionMade) {
-                        html += `
-                            <div class="mt-6 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 rounded-lg font-semibold">
-                                <p class="text-sm">⚠️ **MAKLUMAT DIPERLUKAN:** Sila pilih **sekurang-kurangnya satu** ${isSelectionType} yang berkaitan untuk membolehkan anda meneruskan ke langkah seterusnya.</p>
-                            </div>
-                        `;
-                    } else {
-                         html += `
-                            <div class="mt-6 p-4 bg-green-100 border-l-4 border-green-500 text-green-700 rounded-lg font-semibold">
-                                <p class="text-sm">✅ **Dipilih:** ${isSelectionType} telah direkodkan. Anda boleh meneruskan.</p>
-                            </div>
-                        `;
-                    }
-                }
                 
             } else if (step.type === 'form') {
                 // --- Maklumat Syarikat (Updated fields) ---
                 const fields = ['Nama Syarikat', 'No SSM (jika ada)', 'Alamat', 'No Telefon', 'Nama Pemilik', 'Jualan tahunan syarikat', 'Bilangan pekerja keseluruhan'];
                 const mandatoryFields = ['Nama Syarikat', 'No SSM (jika ada)', 'Alamat', 'No Telefon']; // Required for Step 0 validation
-                const isComplete = window.isCompanyInfoComplete();
+                // const isComplete = window.isCompanyInfoComplete(); // Validation check removed
 
                 html += '<div class="space-y-6 bg-white p-6 rounded-xl shadow-lg">';
                 fields.forEach(field => {
@@ -1116,23 +1096,17 @@
                     html += `
                         <div>
                             <label for="${id}" class="block text-sm font-medium text-gray-700 mb-1">${label}</label>
-                            <input type="${isNumber ? 'number' : 'text'}" id="${id}" value="${value}" onchange="window.handleAnswer('${id}', this.value)"
-                                class="w-full px-4 py-2 border ${!isComplete && isMandatory && value === '' ? 'border-red-400' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                            <input type="${isNumber ? 'number' : 'text'}" id="${id}" value="${value}" 
+                                onchange="window.handleAnswer('${id}', this.value)"
+                                oninput="window.handleAnswer('${id}', this.value)"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                                 placeholder="${field}">
                         </div>
                     `;
                 });
                 html += '</div>';
                 
-                // Form Completion Warning
-                 if (!isComplete) {
-                        html += `
-                            <div class="mt-6 p-4 bg-red-100 border-l-4 border-red-500 text-red-700 rounded-lg font-semibold">
-                                <p class="text-sm">⚠️ **BORANG TIDAK LENGKAP:** Sila isikan semua medan yang bertanda (<span class="text-red-500">*</span>) untuk membolehkan anda meneruskan ke langkah seterusnya.</p>
-                            </div>
-                        `;
-                    }
-
+                // Form Completion Warning removed
 
             } else if (step.type === 'qa') {
                 // --- QA Sections ---
@@ -1461,7 +1435,10 @@
         }
 
         window.handleAnswer = (key, value) => {
-            let newAnswers = { ...window.appState.answers, [key]: value };
+            // FIX: Ensure value is trimmed for all form inputs to prevent whitespace issues
+            let sanitizedValue = (typeof value === 'string' || value === null || value === undefined) ? String(value).trim() : value;
+            
+            let newAnswers = { ...window.appState.answers, [key]: sanitizedValue };
 
             // Special handling for selection/radio buttons to clear others
             const currentStep = flowSteps[window.appState.currentStep];
@@ -1487,7 +1464,32 @@
         window.changeStep = (direction) => {
             const newStep = window.appState.currentStep + direction;
             if (newStep >= 0 && newStep < flowSteps.length) {
+                // Update state first
                 window.updateState({ currentStep: newStep });
+
+                // NEW LOGIC: Auto-scroll
+                setTimeout(() => {
+                    // 1. Vertical Scroll: Scroll to the top of the main content area
+                    const targetElement = document.getElementById('main-content-start');
+                    if (targetElement) {
+                        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    } else {
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                    
+                    // 2. Horizontal Scroll: Adjust the tab menu position
+                    const activeTabIndex = newStep;
+                    const tabContainer = document.getElementById('tab-nav-container');
+                    const activeTabButton = tabContainer?.children[activeTabIndex];
+                    
+                    if (activeTabButton && tabContainer) {
+                        activeTabButton.scrollIntoView({
+                            behavior: 'smooth',
+                            inline: 'center' // Scroll horizontally to center the active tab
+                        });
+                    }
+                    
+                }, 50); // Small delay ensures content has rendered
             }
         };
 
@@ -1505,7 +1507,9 @@
             // Logic to disable the 'Seterusnya' button
             let disableNext = currentStepIndex === flowSteps.length - 1;
             
-            // Validation rules based on NEW step order
+            // Validation rules based on NEW step order (ALL VALIDATION REMOVED FOR BETA)
+            
+            /*
             if (currentStepIndex === 0) { // Maklumat Syarikat (New Index 0)
                  if (!window.isCompanyInfoComplete()) {
                     disableNext = true;
@@ -1523,7 +1527,8 @@
                     disableNext = true;
                 }
             }
-            
+            */
+
             // The Introduction Text
             const introductionHtml = `
                 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
@@ -1569,19 +1574,21 @@
                         ${introductionHtml}
 
                         <!-- Adjust main padding for consistency -->
-                        <div class="px-4 sm:px-6 lg:px-8">
+                        <div class="px-4 sm:px-6 lg:px-8" id="main-content-start">
                             <!-- Progress and Navigation Tabs -->
                             ${window.renderProgress(score)}
 
                             <!-- Flow Navigation Tabs -->
-                            <nav class="flex overflow-x-auto whitespace-nowrap space-x-2 sm:space-x-4 mb-8 p-1 bg-white rounded-xl shadow-md">
+                            <nav class="flex overflow-x-auto whitespace-nowrap space-x-2 sm:space-x-4 mb-8 p-1 bg-white rounded-xl shadow-md" id="tab-nav-container">
                                 ${flowSteps.map((step, index) => {
                                     // Strip "N. " prefix from the tab title for cleaner navigation (Addressing user request)
                                     const tabTitle = step.title.replace(/^\d+\.\s*/, '');
+                                    
+                                    // Modified button structure: Removed onclick handler and enforced cursor-default
                                     return `
-                                        <button onclick="window.updateState({ currentStep: ${index} })"
-                                            class="py-3 px-3 sm:px-4 text-sm font-medium transition duration-150 rounded-lg
-                                            ${index === currentStepIndex ? 'tab-active bg-teal-50' : (index < currentStepIndex ? 'text-gray-600 hover:text-teal-600' : 'text-gray-400 cursor-not-allowed')}">
+                                        <button 
+                                            class="py-3 px-3 sm:px-4 text-sm font-medium transition duration-150 rounded-lg cursor-default 
+                                            ${index === currentStepIndex ? 'tab-active bg-teal-50' : 'text-gray-600'}">
                                             ${tabTitle}
                                         </button>
                                     `;
