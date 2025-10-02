@@ -104,7 +104,7 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signOut, GoogleAuthProvider, signInWithPopup, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot, setLogLevel, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- GLOBAL FIREBASE VARIABLES (MANDATORY USE) ---
@@ -128,6 +128,7 @@
             answers: {},
             // NEW: Payment status for PDF download
             isPaidClient: false, 
+            isRegisterMode: false // NEW: Control display between Login and Register form
         };
 
         // Global Chart variable (to destroy previous instance)
@@ -358,27 +359,52 @@
             }
         };
 
-        // NEW: Google Sign-In Handler
-        window.handleGoogleSignIn = async () => {
-            const provider = new GoogleAuthProvider();
+        // NEW: Email/Password Authentication Handlers
+        window.handleAuth = async (isRegister) => {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorMessageElement = document.getElementById('auth-error-message');
+            errorMessageElement.textContent = '';
+
+            if (!email || !password) {
+                errorMessageElement.textContent = "Sila masukkan emel dan kata laluan.";
+                return;
+            }
+            
+            // Basic email validation
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                errorMessageElement.textContent = "Sila masukkan format emel yang sah.";
+                return;
+            }
+
             try {
-                // Sign in with Google popup
-                await signInWithPopup(window.auth, provider);
-                // The onAuthStateChanged listener will handle further rendering
+                if (isRegister) {
+                    // Register New User
+                    await createUserWithEmailAndPassword(window.auth, email, password);
+                } else {
+                    // Sign In Existing User
+                    await signInWithEmailAndPassword(window.auth, email, password);
+                }
+                // onAuthStateChanged will handle the rest
             } catch (error) {
-                console.error("Google sign-in failed:", error);
-                let errorMessage = "Gagal log masuk dengan Google: Sila cuba lagi atau semak sambungan internet anda.";
-                
-                // FIX: Check for auth/unauthorized-domain error and provide actionable instruction
-                if (error.code === 'auth/unauthorized-domain') {
-                    errorMessage = "Ralat: Domain tidak dibenarkan. Sila pastikan domain hos aplikasi ini telah ditambah ke dalam senarai domain yang dibenarkan dalam Konsol Firebase anda (Authentication -> Settings -> Authorized domains).";
+                console.error("Authentication failed:", error);
+                let displayMessage = "Gagal log masuk. Sila cuba lagi.";
+
+                if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                    displayMessage = "Emel atau kata laluan tidak sah.";
+                } else if (error.code === 'auth/email-already-in-use') {
+                    displayMessage = "Emel ini sudah berdaftar. Sila Log Masuk.";
+                    window.updateState({ isRegisterMode: false }); // Switch to login view
+                    return; // Prevent showing message on the wrong view
+                } else if (error.code === 'auth/invalid-email') {
+                    displayMessage = "Format emel tidak sah.";
+                } else if (error.code === 'auth/weak-password') {
+                    displayMessage = "Kata laluan terlalu lemah (minimum 6 aksara).";
                 }
                 
-                // Display error message to user
-                document.getElementById('login-error-message').textContent = errorMessage;
+                errorMessageElement.textContent = displayMessage;
             }
         };
-
 
         // Auth and Firestore Initialization
         window.onload = async () => {
@@ -426,12 +452,8 @@
                         }
                     });
 
-                    // >>> START MODIFICATION: REMOVE AUTO-LOGIN LOGIC <<<
-                    // Dibuang: if (initialAuthToken) { await signInWithCustomToken(window.auth, initialAuthToken); }
-                    // Ini memastikan satu-satunya cara untuk log masuk adalah melalui Google Sign-In.
                     window.appState = { ...window.appState, authReady: true };
                     window.renderApp(); 
-                    // >>> END MODIFICATION <<<
 
                 } catch (error) {
                     console.error("Firebase initialization or sign-in failed:", error);
@@ -901,23 +923,37 @@
         // --- Rendering Functions ---
 
         window.renderLogin = () => {
+            const isRegister = window.appState.isRegisterMode;
+            
             return `
                 <div class="h-screen flex items-center justify-center p-4">
                     <div class="bg-white p-8 rounded-lg shadow-2xl w-full max-w-md">
-                        <h1 class="text-3xl font-bold mb-6 text-center text-gray-800">Log Masuk Klien</h1>
-                        <p class="text-center text-sm text-gray-500 mb-8">Sila daftar atau log masuk menggunakan akaun Google anda untuk mengakses Penilaian.</p>
+                        <h1 class="text-3xl font-bold mb-6 text-center text-gray-800">${isRegister ? 'Daftar Akaun Baharu' : 'Log Masuk Klien'}</h1>
+                        
                         <div class="space-y-4">
+                            <input type="email" id="email" placeholder="Alamat Emel" required
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500" />
                             
-                            <!-- Google Sign-In Button -->
-                            <button onclick="window.handleGoogleSignIn()" class="w-full py-3 rounded-xl text-white font-semibold shadow-md hover:shadow-lg flex items-center justify-center" style="background-color: #DB4437; hover:background-color: #C33025;">
-                                <svg class="w-5 h-5 mr-3" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M44.5 20H24V28.8H36.3C35.2 32.5 31.5 35 24 35C17.3 35 12 29.7 12 23S17.3 11 24 11C27.5 11 30.5 12.3 32.7 14.3L38.3 8.7C34.7 5.5 29.6 3 24 3C12.4 3 3 12.4 3 23S12.4 43 24 43C34.6 43 43.1 35.3 43.1 23C43.1 21.6 42.9 20.3 42.6 19H44.5V20Z" fill="#fff"/></svg>
-                                Log Masuk dengan Google
+                            <input type="password" id="password" placeholder="Kata Laluan (Min 6 Aksara)" required
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500" />
+
+                            <p id="auth-error-message" class="text-sm text-red-500 text-center"></p>
+
+                            <!-- Primary Action Button -->
+                            <button onclick="window.handleAuth(${isRegister})"
+                                class="w-full btn-primary py-3 rounded-xl text-white font-semibold shadow-md hover:shadow-lg">
+                                ${isRegister ? 'Daftar Sekarang' : 'Log Masuk'}
                             </button>
-
-                            <p id="login-error-message" class="text-sm text-red-500 text-center"></p>
-
+                            
+                            <!-- Toggle Link -->
+                            <p class="text-center text-sm mt-4">
+                                ${isRegister ? 
+                                    `Sudah ada akaun? <a href="#" onclick="window.updateState({ isRegisterMode: false })" class="text-teal-600 hover:text-teal-800 font-semibold">Log Masuk di sini</a>` :
+                                    `Belum mendaftar? <a href="#" onclick="window.updateState({ isRegisterMode: true })" class="text-teal-600 hover:text-teal-800 font-semibold">Daftar Akaun Baharu</a>`
+                                }
+                            </p>
                         </div>
+
                         <p class="mt-6 text-xs text-center">
                             <a href="landing_page.html" class="text-teal-600 hover:text-teal-800 font-medium">
                                 &larr; Kembali ke Halaman Utama
