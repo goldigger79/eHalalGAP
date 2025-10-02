@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Konsultan eHalalGAP</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+     <!-- Load html2pdf.js for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Load Chart.js for visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f7f9fb; }
+        .hero-bg { background-color: #1a4f78; } 
+        .btn-primary { background-color: #0d9488; transition: background-color 0.3s; }
+        .btn-primary:hover { background-color: #0f766e; }
+        .btn-secondary { background-color: #e5e7eb; color: #374151; transition: background-color 0.3s; }
+        .btn-secondary:hover { background-color: #d1d5db; }
+        .modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.7); display: none; justify-content: center;
+            align-items: center; z-index: 50; overflow-y: auto; padding: 20px;
+        }
+        .modal-content {
+            background-color: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            width: 95%; max-width: 1200px; max-height: 95vh; overflow-y: auto; position: relative;
+        }
+    </style>
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, collection, query, getDoc, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- GLOBAL FIREBASE VARIABLES (MANDATORY USE) ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // ----------------------------------------------------
+
+        let app = null;
+        window.db = null;
+        window.auth = null;
+        let clientCollectionRef = null;
+
+        window.appState = {
+            isAuthenticated: false,
+            authReady: false,
+            userId: null,
+            view: 'list', // 'list' or 'report'
+            clients: [],
+            selectedClientData: null,
+            selectedClientSummary: null,
+        };
+        
+        let pieChartInstance = null; // Global Chart variable
+
+        // All questionnaire and flow data - MUST BE COPIED EXACTLY from index.html
+        const flowSteps = [
+            { id: 'maklumat', title: '1. Maklumat Syarikat', type: 'form', description: 'Sila isikan maklumat asas syarikat anda.'}, 
+            { id: 'syarat', title: '2. Syarat Kelayakan', type: 'checklist', description: 'Sila semak sama ada syarikat anda memenuhi syarat-syarat asas ini.', questions: [
+                "Adakah syarikat berdaftar dengan Suruhanjaya Syarikat Malaysia (SSM)?", "Adakah syarikat Telah beroperasi sepenuhnya sekurang-kurangnya 3 bulan?", "Adakah syarikat Memiliki lesen atau kelulusan daripada PBT?", "Jika premis makanan, adakah telah mendapat perakuan FOSIM? *", "Jika skim kosmetik, adakah telah mendapat perakuan NPRA? *"
+            ]},
+            { id: 'kategori', title: '3. Kategori Industri', type: 'selection', description: 'Sila pilih **salah satu** kategori industri syarikat anda.', options: ['Mikro (Jualan Tahunan < RM300,000 ATAU Pekerja < 5 orang)', 'Kecil (Jualan Tahunan RM300,000 - RM 15 juta ATAU Pekerja 5 - 75 orang)', 'Sederhana (Jualan Tahunan RM 15 juta - RM 50 juta ATAU Pekerja 75 - 200 orang)', 'Besar (Jualan Tahunan > RM 50 juta ATAU Pekerja > 200 orang)']}, 
+            { id: 'skim', title: '4. Skim Pensijilan', type: 'selection', description: 'Sila pilih **salah satu** skim pensijilan Halal yang berkaitan dengan jenis perniagaan anda.', options: ['Produk Makanan dan Minuman', 'Produk Kosmetik', 'Produk Farmaseutikal', 'Premis Makanan', 'Produk Barang Gunaan', 'Perkhidmatan Logistik', 'Rumah Sembelihan', 'Pengilangan Kontrak/OEM', 'Produk Peranti Perubatan']},
+            { id: 'premis', title: '5. Premis', type: 'qa', description: 'Soalan berkaitan lokasi, struktur, dan pelan lantai premis.'}, 
+            { id: 'bahan', title: '6. Bahan Mentah & Peralatan', type: 'qa', description: 'Soalan berkaitan bahan mentah, penyimpanan, dan peralatan.'}, 
+            { id: 'sanitasi', title: '7. Sanitasi', type: 'qa', description: 'Soalan berkaitan kebersihan dan kawalan makhluk perosak.'}, 
+            { id: 'pekerja', title: '8. Pekerja', type: 'qa', description: 'Soalan berkaitan pekerja dan latihan halal.'}, 
+            { id: 'dokumentasi', title: '9. Dokumentasi & Rekod', type: 'qa', description: 'Soalan berkaitan sistem dokumentasi dan rekod syarikat.'}, 
+            { id: 'result', title: '10. Keputusan & Laporan', type: 'result', description: 'Laporan Kesediaan Halal JAKIM anda.' }
+        ];
+
+        // Combined Q/A Data for scored sections - MUST BE COPIED EXACTLY
+        const qaQuestions = {
+            premis: ["Adakah premis anda terletak jauh dari dan tidak dicemari oleh ladang babi atau aktiviti pemprosesan tidak halal?", "Adakah premis bebas daripada bahan mentah dan produk tidak halal seperti arak dan daging babi?", "Adakah premis mempunyai mekanisme pengawalan bagi mencegah haiwan peliharaan atau liar, serangga dan haiwan perosak daripada memasuki atau berada di dalam kawasan premis?", "Adakah premis dalam keadaan baik, bersih dan kemas?", "Adakah lantai, dinding, siling, kipas, penghawa dingin, tingkap dan pintu berkeadaan bersih dan tidak menyumbang kepada pencemaran?", "Adakah bekalan air terawat dari Jabatan Bekalan Air (potable water) mencukupi dan dilindungi daripada pencemaran?", "Adakah ruang simpanan bahan mentah dipisahkan daripada ruang simpanan produk siap?", "Adakah terdapat kemudahan sinki untuk basuh tangan yang dilengkapi dengan sabun dan tuala pakai buang/pengering tangan?", "Adakah lantai diperbuat daripada bahan kalis air, tidak menyerap dan mudah dibersihkan?", "Adakah terdapat sistem saliran air yang baik pada lantai pemprosesan?", "Adakah dinding premis licin, kalis air, dan mudah dicuci?", "Adakah siling atau bahagian atas premis direka untuk elak habuk jatuh, kulapuk dan titisan air?", "Adakah pintu premis diperbuat daripada bahan kalis air, mudah dibersihkan, dan ditutup secara kendiri?", "Adakah tingkap yang boleh dibuka dilengkapi dengan jaring/mosquito net untuk elak serangga masuk?", "Adakah pencahayaan di kawasan pemprosesan mencukupi dan tidak menyebabkan risiko pencemaran makanan?", "Adakah lampu yang berpenutup digunakan di kawasan pemprosesan?", "Adakah sistem pengudaraan premis berfungsi baik dan aliran udara bergerak dari kawasan bersih ke kawasan kurang bersih (bukan sebaliknya)?", "Adakah bilik air/tandas disediakan dalam jumlah mencukupi?", "Adakah bilik air/tandas tidak terus bersambung dengan ruang pemprosesan makanan?", "Adakah premis mempunyai stor yang berasingan untuk Bahan mentah?", "Adakah premis mempunyai stor yang berasingan untuk Produk siap?", "Adakah premis mempunyai stor yang berasingan untuk Bahan kimia/pembersihan?", "Adakah premis menyediakan ruang solat kepada pekerja muslim?", "Adakah premis menyediakan ruang persalinan kepada pekerja?", "Adakah premis menyediakan ruang makan atau rehat kepada pekerja?", "Adakah premis menyediakan kemudahan penyimpanan barang peribadi kepada pekerja?", "Adakah premis memastikan alat dan unsur penyembahan tidak berada dalam kawasan pemprosesan?", "Adakah premis memastikan tempat tinggal pekerja tidak berada dalam kawasan premis?", "Adakah aliran proses pengeluaran makanan dalam premis satu arah (linear flow)?", "Adakah terdapat pemisahan kawasan bersih dan kawasan kotor untuk mengelakkan pencemaran?"],
+            bahan: ["Adakah semua bahan mentah (termasuk bahan tambahan & bahan pembungkusan primer) mempunyai sijil halal yang sah?", "Jika bahan mentah diimport, adakah ia daripada badan pensijilan halal luar negara yang diiktiraf JAKIM?", "Adakah rekod pembelian bahan mentah (invois, delivery order) disimpan dan boleh diaudit?", "Adakah terdapat sebarang bahan mentah daripada sumber syubhah/diragui?", "Adakah bahan mentah halal disimpan berasingan daripada bahan tidak halal/diragui?", "Adakah stor bahan mentah dilabel dengan jelas untuk elak kekeliruan (contoh: 'Halal Certified', 'Non-halal', 'Bahan Kimia')?"],
+            sanitasi: ["Adakah terdapat sink untuk basuh tangan yang dilengkapi sabun, tisu/pengering automatik, dan air bersih?", "Adakah terdapat jadual pembersihan dan sanitasi bertulis yang disediakan dan disemak?", "Adakah tong sampah bertutup dan mudah dibersihkan digunakan dalam premis?", "Adakah bilik air/tandas Bersih, tidak berbau dan tidak terbuka secara langsung kepada kawasan pemprosesan?", "Adakah terdapat sistem kawalan makhluk perosak?"],
+            pekerja: ["Adakah syarikat mempunyai pekerja muslim warganegara?", "Adakah pekerja syarikat telah menerima latihan halal?"],
+            dokumentasi: ["Adakah dokumen dan rekod disimpan dengan baik, dikemaskini dan mudah untuk dirujuk?", "Adakah syarikat menyimpan rekod pembelian bahan mentah bersama sijil halal pembekal?"]
+        };
+
+        // Define point scores for each section's questions - MUST BE COPIED EXACTLY
+        const questionPoints = {
+            'syarat': [7, 7, 7, 7, 7], 'premis': [7, 7, 5, 3, 7, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 7, 7, 5, 7, 7, 7, 7, 7, 7, 5, 3, 7, 5, 7, 7], 
+            'bahan': [7, 7, 7, 7, 7, 5], 'sanitasi': [5, 5, 3, 5, 5], 'pekerja': [7, 5], 'dokumentasi': [5, 5]
+        };
+
+        // --- FIREBASE PATH HELPERS ---
+        const getPublicAssessmentsCollectionRef = () => {
+            // Path: /artifacts/{appId}/public/data/assessments
+            return collection(window.db, `/artifacts/${appId}/public/data/assessments`);
+        };
+        const getClientDocRef = (userId) => {
+            // Path: /artifacts/{appId}/users/{userId}/halal_readiness_assessment/data
+            const collectionPath = `/artifacts/${appId}/users/${userId}/halal_readiness_assessment`;
+            return doc(window.db, collectionPath, 'data');
+        };
+        
+        // --- CORE LOGIC ---
+
+        const updateState = (newState) => {
+            window.appState = { ...window.appState, ...newState };
+            renderApp();
+        };
+
+        const calculateScore = () => {
+            const MAX_TOTAL_POINTS = 308;
+            let totalPointsScored = 0;
+            let totalScoredQuestions = 0;
+            let totalAnswered = 0;
+            let countYa = 0;
+            let countTidak = 0;
+            let countTidakPasti = 0;
+            const scoredSections = ['syarat', 'premis', 'bahan', 'sanitasi', 'pekerja', 'dokumentasi'];
+
+            scoredSections.forEach(sectionId => {
+                const questions = (sectionId === 'syarat') ? flowSteps.find(s => s.id === 'syarat').questions : qaQuestions[sectionId];
+                const points = questionPoints[sectionId] || [];
+                totalScoredQuestions += questions.length;
+
+                questions.forEach((q, index) => {
+                    const questionKey = `${sectionId}_${index}`;
+                    const answer = window.appState.selectedClientData?.answers[questionKey];
+                    const pointValue = points[index] || 0; 
+
+                    if (answer) {
+                        totalAnswered++;
+                        let isReadyAnswer = (answer === 'YA');
+                        if (sectionId === 'bahan' && index === 3) { isReadyAnswer = (answer === 'TIDAK'); } // Inverted scoring
+
+                        if (isReadyAnswer) {
+                            totalPointsScored += pointValue;
+                            countYa++;
+                        } else if (answer === 'TIDAK') {
+                            countTidak++;
+                        } else if (answer === 'TIDAK PASTI') {
+                            countTidakPasti++;
+                        }
+                    }
+                });
+            });
+
+            const readinessScore = MAX_TOTAL_POINTS > 0 ? (totalPointsScored / MAX_TOTAL_POINTS) * 100 : 0;
+            
+            return { 
+                totalQuestions: MAX_TOTAL_POINTS, totalAnswered: totalAnswered,
+                totalPointsScored: totalPointsScored, totalScoredQuestions: totalScoredQuestions,
+                readinessScore: parseFloat(readinessScore.toFixed(2)),
+                answerBreakdown: { ya: countYa, tidak: countTidak, tidakPasti: countTidakPasti, notAnswered: totalScoredQuestions - totalAnswered }
+            };
+        };
+
+        // NEW: Function to load selected client's full report data
+        window.viewClientReport = async (userId, summary) => {
+            try {
+                // Display loading state
+                updateState({ view: 'report', selectedClientSummary: summary, selectedClientData: null });
+                
+                const docRef = getClientDocRef(userId);
+                const docSnap = await getDoc(docRef);
+                
+                if (docSnap.exists()) {
+                    updateState({ selectedClientData: docSnap.data() });
+                } else {
+                    updateState({ selectedClientData: { answers: {} } });
+                    console.warn("Client full data not found.");
+                }
+            } catch (error) {
+                console.error("Error fetching client full report:", error);
+                // Fallback to viewing with only summary data
+                updateState({ selectedClientData: { answers: {} } }); 
+            }
+        };
+
+        window.backToClientList = () => {
+            updateState({ view: 'list', selectedClientData: null, selectedClientSummary: null });
+        };
+        
+        window.renderPieChart = (answerBreakdown) => {
+            const ctx = document.getElementById('reportPieChart');
+            if (!ctx) return;
+            
+            if (pieChartInstance) { pieChartInstance.destroy(); }
+
+            pieChartInstance = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['YA (Halal Ready)', 'TIDAK (Perlu Tindakan)', 'Belum Dijawab'],
+                    datasets: [{
+                        data: [answerBreakdown.ya, answerBreakdown.tidak, answerBreakdown.notAnswered],
+                        backgroundColor: ['#0d9488', '#dc2626', '#e5e7eb'],
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 14 } } },
+                        title: { display: true, text: 'Analisis Jawapan Keseluruhan (Berdasarkan Bilangan Soalan)', font: { size: 18, family: 'Inter', weight: 'bold' } },
+                        tooltip: { callbacks: { label: (context) => {
+                                    let label = context.label || '';
+                                    if (label) label += ': ';
+                                    if (context.parsed !== null) {
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = (context.parsed / total * 100).toFixed(1) + '%';
+                                        label += context.parsed + ` (${percentage})`;
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        };
+
+        const renderGapsTable = (answers, scoredSections) => {
+            let gapHtml = '';
+            const allGaps = [];
+            const flowStepsMap = flowSteps.reduce((map, step) => {
+                if (step.type === 'qa' || step.type === 'checklist') { map[step.id] = step; }
+                return map;
+            }, {});
+
+            scoredSections.forEach(sectionId => {
+                const questions = (sectionId === 'syarat') ? flowSteps.find(s => s.id === 'syarat').questions : qaQuestions[sectionId];
+                const points = questionPoints[sectionId] || [];
+                const stepObject = flowStepsMap[sectionId];
+                const secTitle = stepObject ? stepObject.title.replace(/^\d+\.\s*/, '') : 'Bahagian Tidak Diketahui'; 
+                
+                questions.forEach((q, index) => {
+                    const answer = answers[`${sectionId}_${index}`];
+                    const pointValue = points[index] || 0;
+                    
+                    let isGap = false;
+                    
+                    if (answer === 'TIDAK') { isGap = true; } 
+                    if (sectionId === 'bahan' && index === 3 && answer === 'YA') { isGap = true; } // Inverted scoring
+                    
+                    if (isGap) {
+                        allGaps.push({
+                            section: secTitle,
+                            question: q.replace(/\*/g, '').trim(), 
+                            pointValue: pointValue,
+                        });
+                    }
+                });
+            });
+
+            if (allGaps.length === 0) {
+                return '<p class="text-sm text-green-600 p-4 border rounded-lg border-green-200 bg-green-50">Tiada jurang kritikal (jawapan TIDAK) dikesan. Klien telah mencapai tahap kesediaan yang tinggi.</p>';
+            }
+
+            gapHtml = `
+                <div class="overflow-x-auto shadow-md rounded-lg">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bahagian</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Soalan Jurang (GAP)</th>
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Mata Hilang</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            ${allGaps.map((gap, index) => `
+                                <tr class="${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-red-50/50">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-700">${gap.section}</td>
+                                    <td class="px-6 py-4 text-sm text-gray-900">${gap.question}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-bold text-red-600">${gap.pointValue}</td>
+                                </tr>
+                            `).join('')}
+                            <tr class="bg-red-100/70 font-bold">
+                                <td colspan="2" class="px-6 py-3 text-right text-sm text-gray-800">Jumlah Mata Berwajaran Hilang:</td>
+                                <td class="px-6 py-3 text-center text-sm text-red-800">${allGaps.reduce((sum, gap) => sum + gap.pointValue, 0)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            return gapHtml;
+        }
+
+        // --- PDF GENERATION ---
+        window.downloadClientReportPDF = () => {
+            const reportData = window.appState.selectedClientData;
+            const reportSummary = window.appState.selectedClientSummary;
+            if (!reportData || !reportSummary) {
+                alert("Ralat: Data laporan klien tidak dimuatkan sepenuhnya.");
+                return;
+            }
+
+            const clientName = reportSummary.clientName.replace(/\s+/g, '_');
+            const filename = `Laporan_Konsultan_${clientName}_${new Date().toISOString().slice(0, 10)}.pdf`;
+
+            // Function call to render the report content for PDF purposes
+            const element = document.getElementById('report-view-container');
+
+            const opt = {
+                margin: 1,
+                filename: filename,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 3, logging: true, useCORS: true }, 
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+
+            // Use html2pdf to generate and download the PDF
+            html2pdf().set(opt).from(element).save();
+        };
+
+        // --- RENDER FUNCTIONS ---
+        const renderClientList = () => {
+            const clients = window.appState.clients;
+            
+            return `
+                <h2 class="text-3xl font-bold text-gray-800 mb-6">Senarai Klien eHalalGAP</h2>
+                <p class="text-gray-600 mb-6">Berikut adalah senarai klien yang telah memulakan penilaian. Klik 'Lihat Laporan' untuk analisis terperinci.</p>
+
+                ${clients.length === 0 ? `
+                    <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg">
+                        <p class="font-bold">Tiada Klien (Beta Test Mode):</p>
+                        <p>Senarai ini kosong kerana butiran klien mock telah dikeluarkan. Senarai ini akan diisi secara automatik apabila klien sebenar Log Masuk/Daftar dan mula menyimpan kemajuan mereka.</p>
+                    </div>
+                ` : `
+                    <div class="space-y-4">
+                        ${clients.map(client => {
+                            const progress = parseFloat(client.progressPercentage || 0);
+                            const score = parseFloat(client.readinessScore || 0);
+                            let status = '';
+                            let statusClass = 'text-gray-500';
+                            
+                            if (progress < 100) {
+                                status = 'Dalam Proses';
+                                statusClass = 'text-blue-600';
+                            } else if (score >= 95) {
+                                status = 'Bersedia Penuh';
+                                statusClass = 'text-green-600';
+                            } else if (score >= 80) {
+                                status = 'Sederhana';
+                                statusClass = 'text-yellow-600';
+                            } else {
+                                status = 'Perlu Tindakan';
+                                statusClass = 'text-red-600';
+                            }
+
+                            return `
+                                <div class="bg-white p-5 rounded-xl shadow-md flex flex-col md:flex-row justify-between items-start md:items-center">
+                                    <div>
+                                        <h3 class="text-lg font-semibold text-gray-900">${client.clientName}</h3>
+                                        <p class="text-xs text-gray-500 mb-2">ID: ${client.userId}</p>
+                                        <p class="text-sm font-medium ${statusClass}">Status: ${status}</p>
+                                    </div>
+                                    <div class="mt-3 md:mt-0 text-right">
+                                        <p class="text-sm text-gray-700">Progres: ${client.progressPercentage}% lengkap</p>
+                                        <button onclick="window.viewClientReport('${client.userId}', ${JSON.stringify(client)})"
+                                            class="btn-primary px-4 py-2 mt-2 rounded-lg text-white text-sm font-medium hover:bg-teal-700">
+                                            Lihat Laporan &rarr;
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `}
+            `;
+        };
+
+        const renderReportView = () => {
+            const summary = window.appState.selectedClientSummary;
+            const data = window.appState.selectedClientData;
+
+            if (!data) {
+                return `
+                    <div class="flex flex-col items-center justify-center h-64">
+                        <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-teal-500"></div>
+                        <p class="ml-4 text-teal-600 mt-4">Memuatkan Laporan Klien ${summary?.clientName || ''}...</p>
+                    </div>
+                `;
+            }
+
+            const score = calculateScore();
+            const progress = score.readinessScore;
+            const currentAnswers = data.answers;
+            const scoredSections = ['syarat', 'premis', 'bahan', 'sanitasi', 'pekerja', 'dokumentasi'];
+            
+            let status = '';
+            let statusColor = '';
+            let recommendation = '';
+
+            if (progress >= 95) {
+                status = 'Bersedia';
+                statusColor = 'bg-green-100 text-green-700 border-green-500';
+                recommendation = 'Klien ini menunjukkan kesediaan yang sangat tinggi. Fokus pada pengesahan rekod dan penyediaan Audit Halal rasmi.';
+            } else if (progress >= 80) {
+                status = 'Sederhana';
+                statusColor = 'bg-yellow-100 text-yellow-700 border-yellow-500';
+                recommendation = 'Klien berada di tahap sederhana. Kenal pasti Jurang Pematuhan Kritikal di bawah untuk merangka Pelan Tindakan segera.';
+            } else {
+                status = 'Tidak Bersedia';
+                statusColor = 'bg-red-100 text-red-700 border-red-500';
+                recommendation = 'Klien memerlukan intervensi dan penambahbaikan signifikan. Pelan Tindakan Komprehensif diperlukan untuk meningkatkan skor melebihi 80%.';
+            }
+
+            // Rendered Content for both screen and PDF
+            const reportHtml = `
+                <div id="report-view-container" class="p-8 space-y-8 bg-white print:shadow-none print:border-none">
+                    <div class="text-center pb-4 border-b border-gray-200">
+                        <h1 class="text-3xl font-extrabold text-gray-800">Laporan Konsultan eHalalGAP</h1>
+                        <p class="text-lg text-gray-500 mt-1">Analisis Terperinci Klien: ${summary?.clientName || 'Tidak Diketahui'}</p>
+                        <p class="text-sm text-gray-500">ID Klien: ${summary?.userId}</p>
+                        <p class="text-sm text-gray-500">Tarikh Semakan: ${new Date().toLocaleDateString('ms-MY')}</p>
+                    </div>
+
+                    <!-- Ringkasan Keputusan -->
+                    <div class="p-6 rounded-xl shadow-lg border border-gray-100">
+                        <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Ringkasan Keputusan</h3>
+                        <div class="flex flex-col sm:flex-row items-center justify-around text-center space-y-4 sm:space-y-0">
+                            <div>
+                                <p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p>
+                                <p class="text-xl text-gray-500 mt-1">Peratus Kesediaan</p>
+                            </div>
+                            <div>
+                                <p class="text-5xl font-extrabold text-gray-800">${score.totalPointsScored} / ${score.totalQuestions}</p>
+                                <p class="text-xl text-gray-500 mt-1">Mata Halal Diperolehi (Max ${score.totalQuestions} Mata)</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Status dan Rekomendasi -->
+                    <div class="text-center p-6 rounded-xl border-4 ${statusColor} shadow-md">
+                        <p class="text-2xl font-bold">Status Konsultan: <span class="text-3xl">${status.toUpperCase()}</span></p>
+                        <p class="mt-4 text-md text-gray-700">${recommendation}</p>
+                    </div>
+
+                    <!-- Maklumat Syarikat -->
+                    <div class="p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-200">
+                        <h4 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Maklumat Syarikat</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+                            ${['Nama Syarikat', 'No SSM (jika ada)', 'Alamat', 'No Telefon', 'Nama Pemilik', 'Jualan tahunan syarikat', 'Bilangan pekerja keseluruhan'].map(field => {
+                                const id = field.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_'); 
+                                const value = currentAnswers[id] || '- Belum diisi -';
+                                return `<p><strong>${field}:</strong> ${value}</p>`;
+                            }).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Carta Pai Analisis Jawapan Keseluruhan -->
+                    <div class="p-6 bg-white rounded-xl shadow-lg">
+                        <h4 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-2">Analisis Jawapan Keseluruhan</h4>
+                        <div class="flex justify-center w-full max-w-lg mx-auto">
+                            <canvas id="reportPieChart" width="400" height="400"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Jurang Pematuhan Kritikal (Jawapan TIDAK) -->
+                    <div class="p-6 bg-white rounded-xl shadow-lg border-t-4 border-red-500">
+                        <h4 class="text-xl font-bold text-red-700 mb-4 border-b pb-2">
+                             <svg class="w-6 h-6 inline mr-2 -mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.332 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                             Jurang Pematuhan Kritikal (Jawapan TIDAK)
+                        </h4>
+                        ${renderGapsTable(currentAnswers, scoredSections)}
+                    </div>
+                    
+                    <!-- Analisis GAP Mengikut Bahagian (Full Details) -->
+                    <div class="p-6 bg-white rounded-xl shadow-lg">
+                        <h4 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-2">Analisis GAP Mengikut Bahagian</h4>
+                        ${scoredSections.map(sectionId => {
+                            const questions = (sectionId === 'syarat') ? flowSteps.find(s => s.id === 'syarat').questions : qaQuestions[sectionId];
+                            const points = questionPoints[sectionId] || [];
+                            let secMaxPoints = 0; let secPointsScored = 0; let secNeedsImprovement = 0;
+                            points.forEach(p => { secMaxPoints += p; });
+
+                            questions.forEach((q, index) => {
+                                const answer = currentAnswers[`${sectionId}_${index}`];
+                                if (answer) {
+                                    let isReadyAnswer = (answer === 'YA');
+                                    if (sectionId === 'bahan' && index === 3) { isReadyAnswer = (answer === 'TIDAK'); }
+                                    if (isReadyAnswer) { secPointsScored += points[index]; } 
+                                    else if (answer === 'TIDAK') { secNeedsImprovement++; }
+                                }
+                            });
+                            
+                            const secPercentage = secMaxPoints > 0 ? (secPointsScored / secMaxPoints) * 100 : 0;
+                            const stepObject = flowSteps.find(s => s.id === sectionId);
+                            const secTitle = stepObject ? stepObject.title.replace(/^\d+\.\s*/, '') : 'Bahagian Tidak Diketahui'; 
+                            const barColor = secPercentage >= 80 ? 'bg-green-500' : secPercentage >= 50 ? 'bg-yellow-500' : 'bg-red-500';
+                            
+                            return `
+                                <div class="mb-6 border-b pb-4">
+                                    <h5 class="text-lg font-bold text-gray-800 mb-2">${secTitle}</h5>
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="text-sm font-medium text-gray-700">Mata Diperolehi: ${secPointsScored}/${secMaxPoints}</span>
+                                        <span class="text-lg font-bold ${secNeedsImprovement > 0 ? 'text-red-600' : 'text-green-600'}">${secPercentage.toFixed(0)}%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-3">
+                                        <div class="${barColor} h-3 rounded-full" style="width: ${secPercentage.toFixed(0)}%"></div>
+                                    </div>
+                                    ${secNeedsImprovement > 0 ? `<p class="text-sm text-red-500 mt-2">Terdapat ${secNeedsImprovement} isu yang memerlukan penambahbaikan segera (TIDAK).</p>` : `<p class="text-sm text-green-500 mt-2">Cemerlang! Bahagian ini memenuhi kriteria.</p>`}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+
+                    <!-- Notis Penafian -->
+                    <div class="pt-8 text-sm text-gray-600 text-center border-t border-gray-200">
+                        <p class="text-xs text-gray-700 italic font-bold">Notis Penafian:</p>
+                        <p class="text-xs text-gray-600 mt-1">Laporan ini disediakan berdasarkan penilaian kendiri oleh usahawan. Segala maklumat yang terkandung hanyalah untuk tujuan rujukan dan penambahbaikan dalaman sahaja. Ia tidak boleh dianggap sebagai bukti rasmi atau dijadikan asas bagi sebarang tindakan undang-undang, tuntutan, atau prosiding lain.</p>
+                    </div>
+                </div>
+            `;
+            return reportHtml;
+        };
+
+        const renderApp = () => {
+            const appContainer = document.getElementById('app-container');
+
+            if (!window.appState.authReady) {
+                appContainer.innerHTML = `<div class="h-screen flex items-center justify-center"><div class="animate-spin rounded-full h-16 w-16 border-b-2 border-teal-500"></div><p class="ml-4 text-teal-600">Mengesahkan Akses...</p></div>`;
+                return;
+            }
+
+            if (!window.appState.isAuthenticated) {
+                appContainer.innerHTML = `
+                    <div class="h-screen flex items-center justify-center p-4">
+                        <div class="bg-white p-8 rounded-lg shadow-2xl w-full max-w-md text-center">
+                            <h1 class="text-3xl font-bold mb-4 text-gray-800">Akses Ditolak</h1>
+                            <p class="text-gray-600 mb-6">Sila log masuk sebagai konsultan untuk mengakses dashboard ini.</p>
+                            <a href="landing_page.html" class="btn-primary inline-flex items-center px-6 py-3 rounded-xl text-white font-semibold">
+                                &larr; Kembali ke Halaman Utama
+                            </a>
+                            <p class="mt-4 text-xs text-gray-500">Akses Konsultan memerlukan token khas.</p>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            const currentView = window.appState.view;
+            let contentHtml = '';
+            
+            if (currentView === 'list') {
+                contentHtml = renderClientList();
+            } else if (currentView === 'report') {
+                contentHtml = renderReportView();
+                // Render chart only after content is in DOM
+                setTimeout(() => {
+                    const score = calculateScore();
+                    if (score.totalAnswered > 0) {
+                        renderPieChart(score.answerBreakdown);
+                    }
+                }, 50);
+            }
+
+            appContainer.innerHTML = `
+                <div class="min-h-screen bg-gray-50 flex flex-col">
+                    <header class="hero-bg py-4 px-4 shadow-lg">
+                        <div class="max-w-6xl mx-auto text-white flex justify-between items-center">
+                            <div>
+                                <h1 class="text-xl font-extrabold tracking-tight sm:text-2xl">
+                                    Dashboard Konsultan eHalalGAP
+                                </h1>
+                                <p class="mt-1 text-sm text-gray-200">${currentView === 'list' ? 'Senarai Klien & Progres' : window.appState.selectedClientSummary?.clientName || 'Laporan Klien'}</p>
+                            </div>
+                            <div class="flex space-x-3">
+                                <!-- Back Button (Visible in Report View) -->
+                                ${currentView === 'report' ? `
+                                    <button onclick="window.backToClientList()"
+                                        class="btn-secondary px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-200">
+                                        &larr; Senarai Klien
+                                    </button>
+                                ` : ''}
+
+                                <!-- Logout Button -->
+                                <button onclick="window.logoutConsultant()"
+                                    class="bg-red-500 text-white hover:bg-red-600 px-4 py-2 rounded-lg text-sm font-semibold transition duration-150 shadow-md flex items-center">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                                    Log Keluar
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main class="flex-grow max-w-6xl mx-auto py-8 w-full px-4 sm:px-6 lg:px-8">
+                        <div class="${currentView === 'list' ? 'bg-white p-6 rounded-xl shadow-xl' : ''}">
+                            ${contentHtml}
+                            
+                            <!-- PDF Download Button (Visible in Report View) -->
+                            ${currentView === 'report' ? `
+                                <div class="mt-8 flex justify-center">
+                                    <button onclick="window.downloadClientReportPDF()"
+                                            class="btn-primary px-6 py-3 rounded-xl text-white font-semibold shadow-lg hover:shadow-xl inline-flex items-center">
+                                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                        Muat Turun Laporan Klien (PDF)
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </main>
+                    
+                    <footer class="bg-gray-800 text-white p-4 mt-8">
+                        <div class="max-w-6xl mx-auto text-center text-sm">
+                            <p>&copy; Hak Cipta Ace UniKL MICET 2025. Semua Hak Cipta Terpelihara.</p>
+                        </div>
+                    </footer>
+                </div>
+            `;
+        };
+        
+        window.logoutConsultant = async () => {
+            if (window.auth) {
+                try {
+                    await signOut(window.auth);
+                    window.location.href = 'landing_page.html'; // Redirect to landing page
+                } catch (error) {
+                    console.error("Error signing out consultant:", error);
+                    alert("Gagal log keluar. Sila cuba lagi.");
+                }
+            }
+        };
+
+        window.onload = async () => {
+            if (!firebaseConfig) {
+                console.error("Firebase config is missing.");
+                updateState({ authReady: true }); // Show access denied/loading screen fallback
+                return;
+            }
+
+            try {
+                app = initializeApp(firebaseConfig);
+                window.db = getFirestore(app);
+                window.auth = getAuth(app);
+                clientCollectionRef = getPublicAssessmentsCollectionRef();
+                
+                // 1. Force Sign-in with Custom Token for Consultant Access
+                if (initialAuthToken) {
+                    await signInWithCustomToken(window.auth, initialAuthToken);
+                    
+                    // 2. Setup Real-time Listener for Client List
+                    onSnapshot(clientCollectionRef, (snapshot) => {
+                        const clients = [];
+                        snapshot.forEach(doc => {
+                            clients.push(doc.data());
+                        });
+                        // Filter out client data if it's currently selected to avoid overwriting during fetch
+                        updateState({ 
+                            clients: clients, 
+                            authReady: true, 
+                            isAuthenticated: true 
+                        });
+                    }, (error) => {
+                        console.error("Error listening to public collection:", error);
+                        updateState({ authReady: true, isAuthenticated: true, clients: [] });
+                    });
+                } else {
+                     // If no custom token is provided (local dev outside canvas)
+                    updateState({ authReady: true, isAuthenticated: false });
+                }
+
+            } catch (error) {
+                console.error("Firebase initialization or sign-in failed:", error);
+                updateState({ authReady: true, isAuthenticated: false });
+            }
+        };
+    </script>
+</head>
+<body>
+    <div id="app-container">
+        <div class="h-screen flex items-center justify-center">
+            <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-teal-500"></div>
+            <p class="ml-4 text-teal-600">Memuatkan Dashboard Konsultan...</p>
+        </div>
+    </div>
+</body>
+</html>
