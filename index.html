@@ -108,9 +108,20 @@
         import { getFirestore, doc, setDoc, onSnapshot, setLogLevel, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- GLOBAL FIREBASE VARIABLES (MANDATORY USE) ---
-        // Menggunakan pembolehubah persekitaran yang disediakan untuk memastikan token authenfikasi sepadan.
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        // MENGGANTI konfigurasi persekitaran dengan konfigurasi baharu yang disediakan.
+        const APP_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyCll1mrRqrAMAUqzdGqSYSyFBiOpb6y_y4",
+            authDomain: "ehalalgap.firebaseapp.com",
+            projectId: "ehalalgap",
+            storageBucket: "ehalalgap.firebasestorage.app",
+            messagingSenderId: "687151615169",
+            appId: "1:687151615169:web:8ff94f1eed2c6d1d5f1840",
+            measurementId: "G-6QBXVD6R0R"
+        };
+        
+        // Menggunakan nilai daripada konfigurasi baharu
+        const appId = APP_FIREBASE_CONFIG.projectId; // Menggunakan ProjectId 'ehalalgap' untuk pathing Firestore
+        const firebaseConfig = APP_FIREBASE_CONFIG;
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; 
         // ----------------------------------------------------
 
@@ -253,8 +264,8 @@
         
         // NEW: Helper to get Firestore document reference for public summary
         const getPublicSummaryDocRef = (userId) => {
-            // Public path for consultant access: /artifacts/${appId}/public/data/assessments
-            const collectionPath = `/artifacts/${appId}/public/data/assessments`; 
+            // FIX: Using 'clients' collection name to match the user's Firestore Security Rules
+            const collectionPath = `/artifacts/${appId}/public/data/clients`; 
             return doc(window.db, collectionPath, userId);
         };
         
@@ -284,6 +295,7 @@
                 await setDoc(docRef, summaryData, { merge: true });
             } catch (error) {
                 console.error("Error saving public summary:", error);
+                // NOTE: If this fails, it is usually a Security Rules issue (e.g., lack of 'create' permission).
             }
         };
 
@@ -361,6 +373,12 @@
 
         // NEW: Email/Password Authentication Handlers
         window.handleAuth = async (isRegister) => {
+            if (!window.auth) {
+                 console.error("Authentication failed: Firebase Auth not initialized.");
+                 document.getElementById('auth-error-message').textContent = "Ralat sistem: Gagal memulakan perkhidmatan log masuk.";
+                 return;
+            }
+            
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const errorMessageElement = document.getElementById('auth-error-message');
@@ -389,8 +407,11 @@
             } catch (error) {
                 console.error("Authentication failed:", error);
                 let displayMessage = "Gagal log masuk. Sila cuba lagi.";
-
-                if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+                
+                if (error.code === 'auth/operation-not-allowed') {
+                    // Ralat ini menunjukkan kaedah Emel/Kata Laluan belum diaktifkan di Console.
+                    displayMessage = "Ralat Konfigurasi: Log Masuk Emel/Kata Laluan belum diaktifkan. Sila aktifkan di Konsol Firebase anda (Authentication -> Sign-in Method).";
+                } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
                     displayMessage = "Emel atau kata laluan tidak sah.";
                 } else if (error.code === 'auth/email-already-in-use') {
                     displayMessage = "Emel ini sudah berdaftar. Sila Log Masuk.";
