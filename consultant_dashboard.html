@@ -436,14 +436,16 @@
             db = getFirestore(app);
             auth = getAuth(app);
             
-            const consultantUID = "7XtS5IWBTpgKryjAvONtXALd8R03";
+            // List of authorized consultant UIDs
+            const consultantUIDs = ["7XtS5IWBTpgKryjAvONtXALd8R03", "A2nVUfDEVkhQPyTf8tUkCoXmQeJ3"];
 
             onAuthStateChanged(auth, (user) => {
-                if (user && user.uid === consultantUID) {
+                // Check if the logged-in user's UID is in the authorized list
+                if (user && consultantUIDs.includes(user.uid)) {
                     showDashboard();
                     loadClients();
                 } else {
-                    if(user) { signOut(auth); }
+                    if(user) { signOut(auth); } // If a non-consultant is logged in, log them out
                     showLogin();
                 }
             });
