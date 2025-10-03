@@ -143,6 +143,7 @@
 
         // Global Chart variable (to destroy previous instance)
         let pieChartInstance = null;
+        let modalPieChartInstance = null;
 
         // All questionnaire and flow data - UPDATED with new UMUM/Syarat Kelayakan questions
         const flowSteps = [
@@ -804,66 +805,38 @@
         }
 
         // --- CHART RENDERING FUNCTION ---
-        window.renderPieChart = (answerBreakdown, canvasId) => {
+        window.renderPieChart = (answerBreakdown, canvasId, chartInstance) => {
             const ctx = document.getElementById(canvasId);
             if (!ctx) return;
-            
-            // Destroy any existing chart instance on this canvas
-            const existingChart = Chart.getChart(ctx);
-            if (existingChart) {
-                existingChart.destroy();
+
+            if (chartInstance) {
+                chartInstance.destroy();
             }
 
-            const chartData = {
-                // REMOVED 'TIDAK PASTI' from labels for a cleaner chart
-                labels: ['YA (Halal Ready)', 'TIDAK (Perlu Tindakan)', 'Belum Dijawab'],
-                datasets: [{
-                    // REMOVED answerBreakdown.tidakPasti from the data
-                    data: [answerBreakdown.ya, answerBreakdown.tidak, answerBreakdown.notAnswered],
-                    backgroundColor: [
-                        '#0d9488', // Teal (YA - Ready)
-                        '#dc2626', // Red (TIDAK - Action Needed)
-                        '#e5e7eb'  // Gray (Not Answered)
-                    ],
-                    hoverOffset: 4
-                }]
-            };
-
-            new Chart(ctx, {
+            return new Chart(ctx, {
                 type: 'pie',
-                data: chartData,
+                data: {
+                    labels: ['YA (Halal Ready)', 'TIDAK (Perlu Tindakan)', 'Belum Dijawab'],
+                    datasets: [{
+                        data: [answerBreakdown.ya, answerBreakdown.tidak, answerBreakdown.notAnswered],
+                        backgroundColor: ['#0d9488', '#dc2626', '#e5e7eb'],
+                        hoverOffset: 4
+                    }]
+                },
                 options: {
                     responsive: true,
                     plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                font: {
-                                    family: 'Inter',
-                                    size: 14
-                                }
-                            }
-                        },
-                        title: {
-                            display: true,
-                            text: 'Analisis Jawapan Keseluruhan (Berdasarkan Bilangan Soalan)',
-                            font: {
-                                size: 18,
-                                family: 'Inter',
-                                weight: 'bold'
-                            }
-                        },
+                        legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 14 } } },
+                        title: { display: true, text: 'Analisis Jawapan Keseluruhan (Berdasarkan Bilangan Soalan)', font: { size: 18, family: 'Inter', weight: 'bold' } },
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
                                     let label = context.label || '';
-                                    if (label) {
-                                        label += ': ';
-                                    }
+                                    if (label) { label += ': '; }
                                     if (context.parsed !== null) {
                                         const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                        const percentage = total > 0 ? (context.parsed / total * 100).toFixed(1) + '%' : '0%';
-                                        label += context.parsed + ` (${percentage})`;
+                                        const percentage = (context.parsed / total * 100).toFixed(1) + '%';
+                                        label += `${context.parsed} (${percentage})`;
                                     }
                                     return label;
                                 }
@@ -890,16 +863,13 @@
             if (modal) {
                 modal.style.display = show ? 'flex' : 'none';
                 if (show) {
-                    // Re-render report content inside modal every time it opens
                     const modalBody = document.getElementById('modal-report-body');
                     if (modalBody) {
                         modalBody.innerHTML = window.renderReportContent();
-                        
-                        // Re-render chart inside the modal content with the correct ID
                         setTimeout(() => {
                             const score = window.calculateScore();
                             if (score.totalAnswered > 0) {
-                                window.renderPieChart(score.answerBreakdown, 'modalReportPieChart');
+                                modalPieChartInstance = window.renderPieChart(score.answerBreakdown, 'modalReportPieChart', modalPieChartInstance);
                             }
                         }, 100);
                     }
@@ -1206,10 +1176,8 @@
                 // Render Chart and call Gemini AI after content is injected into the DOM
                 setTimeout(() => {
                     if (score.totalAnswered > 0) {
-                        // Render Chart into the main screen's pie chart canvas with the correct ID
-                        window.renderPieChart(score.answerBreakdown, 'mainReportPieChart');
+                        pieChartInstance = window.renderPieChart(score.answerBreakdown, 'reportPieChart', pieChartInstance);
                         
-                        // Trigger AI Summary Generation
                         window.getGeminiSummary(score).then(summary => {
                             window.updateAiSummaryDisplay(summary);
                         }).catch(err => {
@@ -1287,7 +1255,7 @@
                     <div class="p-6 bg-white rounded-xl shadow-lg">
                         <h4 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-2">Analisis Jawapan Keseluruhan</h4>
                         <div class="flex justify-center w-full max-w-lg mx-auto">
-                            <canvas id="mainReportPieChart" width="400" height="400"></canvas>
+                            <canvas id="reportPieChart" width="400" height="400"></canvas>
                         </div>
                     </div>
                 </div>
@@ -1393,7 +1361,6 @@
                     <div class="p-6 bg-white rounded-xl shadow-lg">
                         <h4 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-2">Analisis Jawapan Keseluruhan</h4>
                         <div class="flex justify-center w-full max-w-lg mx-auto">
-                            <!-- Use a unique ID for the modal chart -->
                             <canvas id="modalReportPieChart" width="400" height="400"></canvas> 
                         </div>
                     </div>
@@ -1547,28 +1514,6 @@
 
             // Logic to disable the 'Seterusnya' button
             let disableNext = currentStepIndex === flowSteps.length - 1;
-            
-            // Validation rules based on NEW step order (ALL VALIDATION REMOVED FOR BETA)
-            
-            /*
-            if (currentStepIndex === 0) { // Maklumat Syarikat (New Index 0)
-                 if (!window.isCompanyInfoComplete()) {
-                    disableNext = true;
-                }
-            } else if (currentStepIndex === 1) { // Syarat Kelayakan (New Index 1)
-                if (!window.isEligibilityMet()) {
-                    disableNext = true;
-                }
-            } else if (currentStepIndex === 2) { // Kategori Industri (New Index 2)
-                if (!window.isSelectionMade('kategori')) {
-                    disableNext = true;
-                }
-            } else if (currentStepIndex === 3) { // Skim Pensijilan (New Index 3)
-                 if (!window.isSelectionMade('skim')) {
-                    disableNext = true;
-                }
-            }
-            */
 
             // The Introduction Text
             const introductionHtml = `
@@ -1641,19 +1586,20 @@
                                 ${window.renderTabContent()}
                             </div>
 
-                            <!-- Navigation Buttons - UPDATED FOR SAVE BUTTON -->
-                            <div class="mt-8 flex justify-between items-center">
+                            <!-- Navigation Buttons - Responsive Update -->
+                            <div class="mt-8 flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0">
                                 <!-- Button Sebelumnya -->
                                 <button onclick="window.changeStep(-1)" ${currentStepIndex === 0 ? 'disabled' : ''}
-                                    class="btn-secondary px-6 py-3 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                                    &larr; Sebelumnya
+                                    class="w-full sm:w-auto btn-secondary px-6 py-3 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                                    Sebelumnya
                                 </button>
 
                                 <!-- Save Progress Button & Status (Center) -->
-                                <div class="flex flex-col items-center space-y-2">
+                                <div class="flex flex-col items-center space-y-2 w-full sm:w-auto">
                                     <button onclick="window.manualSave()" ${currentStepIndex === flowSteps.length - 1 ? 'disabled' : ''}
                                             id="save-progress-btn" 
-                                            class="inline-flex items-center btn-secondary px-6 py-3 rounded-xl font-semibold hover:bg-teal-100 text-teal-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                                            class="w-full sm:w-auto inline-flex items-center justify-center btn-secondary px-6 py-3 rounded-xl font-semibold hover:bg-teal-100 text-teal-700 disabled:opacity-50 disabled:cursor-not-allowed">
                                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
                                         Simpan Kemajuan
                                     </button>
@@ -1662,8 +1608,9 @@
                                 
                                 <!-- Button Seterusnya -->
                                 <button onclick="window.changeStep(1)" ${disableNext ? 'disabled' : ''}
-                                    class="btn-primary px-6 py-3 rounded-xl text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
-                                    Seterusnya &rarr;
+                                    class="w-full sm:w-auto btn-primary px-6 py-3 rounded-xl text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center">
+                                    Seterusnya
+                                    <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
                                 </button>
                             </div>
                         </div>

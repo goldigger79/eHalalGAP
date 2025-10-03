@@ -54,7 +54,7 @@
                     <span class="text-2xl font-extrabold text-gray-800">eHalal<span class="text-teal-600">GAP</span></span>
                 </div>
                 
-                <!-- Nav Links (Hidden on small screens) -->
+                <!-- Nav Links (Desktop) -->
                 <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
                     <a href="#pengenalan" class="text-gray-500 hover:text-teal-600 px-3 py-2 rounded-md text-sm font-medium transition duration-150">Pengenalan</a>
                     <a href="#ciri" class="text-gray-500 hover:text-teal-600 px-3 py-2 rounded-md text-sm font-medium transition duration-150">Ciri-ciri Utama</a>
@@ -62,13 +62,36 @@
                     <a href="#contact" class="text-gray-500 hover:text-teal-600 px-3 py-2 rounded-md text-sm font-medium transition duration-150">Hubungi Kami</a>
                 </div>
 
-                <!-- CTA Buttons -->
-                <div class="flex items-center space-x-3">
-                    <!-- Log Masuk Klien points to client.html -->
-                    <a href="client.html" class="hidden sm:inline-flex btn-primary px-4 py-2 text-sm rounded-lg shadow-md hover:shadow-lg">
+                <!-- CTA Button (Desktop) -->
+                <div class="hidden sm:flex items-center">
+                    <a href="client.html" class="btn-primary px-4 py-2 text-sm rounded-lg shadow-md hover:shadow-lg">
                         Log Masuk Klien
                     </a>
                 </div>
+
+                <!-- Mobile Menu Button -->
+                <div class="sm:hidden flex items-center">
+                    <button id="mobile-menu-button" class="text-gray-500 hover:text-gray-800 focus:outline-none">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Menu -->
+        <div id="mobile-menu" class="sm:hidden hidden bg-white border-t border-gray-200">
+            <div class="px-2 pt-2 pb-3 space-y-1">
+                <a href="#pengenalan" class="block text-gray-600 hover:bg-gray-100 hover:text-gray-800 px-3 py-2 rounded-md text-base font-medium">Pengenalan</a>
+                <a href="#ciri" class="block text-gray-600 hover:bg-gray-100 hover:text-gray-800 px-3 py-2 rounded-md text-base font-medium">Ciri-ciri Utama</a>
+                <a href="#target" class="block text-gray-600 hover:bg-gray-100 hover:text-gray-800 px-3 py-2 rounded-md text-base font-medium">Objektif & Sasaran</a>
+                <a href="#contact" class="block text-gray-600 hover:bg-gray-100 hover:text-gray-800 px-3 py-2 rounded-md text-base font-medium">Hubungi Kami</a>
+            </div>
+            <div class="px-4 pb-4">
+                 <a href="client.html" class="block w-full text-center btn-primary px-4 py-2 text-base rounded-lg shadow-md hover:shadow-lg">
+                    Log Masuk Klien
+                </a>
             </div>
         </div>
     </nav>
@@ -265,6 +288,14 @@
         </div>
     </footer>
 
+    <script>
+        const mobileMenuButton = document.getElementById('mobile-menu-button');
+        const mobileMenu = document.getElementById('mobile-menu');
+
+        mobileMenuButton.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+        });
+    </script>
 </body>
 </html>
 
