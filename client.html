@@ -138,11 +138,12 @@
         let pieChartInstance = null;
         let modalPieChartInstance = null;
 
+        // UPDATED a new flowSteps
         const flowSteps = [
             { id: 'maklumat', title: '1. Maklumat Syarikat', type: 'form', description: 'Sila isikan maklumat asas syarikat anda.'},
-            { id: 'syarat', title: '2. Syarat Kelayakan', type: 'checklist', description: 'Sila semak sama ada syarikat anda memenuhi syarat-syarat asas ini.', questions: ["Adakah syarikat berdaftar dengan Suruhanjaya Syarikat Malaysia (SSM)?", "Adakah syarikat Telah beroperasi sepenuhnya sekurang-kurangnya 3 bulan?", "Adakah syarikat Memiliki lesen atau kelulusan daripada PBT?", "Jika premis makanan, adakah telah mendapat perakuan FOSIM? *", "Jika skim kosmetik, adakah telah mendapat perakuan NPRA? *"]},
-            { id: 'kategori', title: '3. Kategori Industri', type: 'selection', description: 'Sila pilih **salah satu** kategori industri syarikat anda.', options: ['Mikro (Jualan Tahunan < RM300,000 ATAU Pekerja < 5 orang)', 'Kecil (Jualan Tahunan RM300,000 - RM 15 juta ATAU Pekerja 5 - 75 orang)', 'Sederhana (Jualan Tahunan RM 15 juta - RM 50 juta ATAU Pekerja 75 - 200 orang)', 'Besar (Jualan Tahunan > RM 50 juta ATAU Pekerja > 200 orang)']},
-            { id: 'skim', title: '4. Skim Pensijilan', type: 'selection', description: 'Sila pilih **salah satu** skim pensijilan Halal yang berkaitan dengan jenis perniagaan anda.', options: ['Produk Makanan dan Minuman', 'Produk Kosmetik', 'Produk Farmaseutikal', 'Premis Makanan', 'Produk Barang Gunaan', 'Perkhidmatan Logistik', 'Rumah Sembelihan', 'Pengilangan Kontrak/OEM', 'Produk Peranti Perubatan']},
+            { id: 'kategori', title: '2. Kategori Industri', type: 'selection', description: 'Sila pilih **salah satu** kategori industri syarikat anda.', options: ['Mikro (Jualan Tahunan < RM300,000 ATAU Pekerja < 5 orang)', 'Kecil (Jualan Tahunan RM300,000 - RM 15 juta ATAU Pekerja 5 - 75 orang)', 'Sederhana (Jualan Tahunan RM 15 juta - RM 50 juta ATAU Pekerja 75 - 200 orang)', 'Besar (Jualan Tahunan > RM 50 juta ATAU Pekerja > 200 orang)']},
+            { id: 'skim', title: '3. Skim Pensijilan', type: 'selection', description: 'Sila pilih **salah satu** skim pensijilan Halal yang berkaitan dengan jenis perniagaan anda.', options: ['Produk Makanan dan Minuman', 'Produk Kosmetik', 'Produk Farmaseutikal', 'Premis Makanan', 'Produk Barang Gunaan', 'Perkhidmatan Logistik', 'Rumah Sembelihan', 'Pengilangan Kontrak/OEM', 'Produk Peranti Perubatan']},
+            { id: 'syarat', title: '4. Umum', type: 'checklist', description: 'Sila semak sama ada syarikat anda memenuhi syarat-syarat asas ini.', questions: ["Adakah syarikat berdaftar dengan Suruhanjaya Syarikat Malaysia (SSM)?", "Adakah syarikat Telah beroperasi sepenuhnya sekurang-kurangnya 3 bulan?", "Adakah syarikat Memiliki lesen atau kelulusan daripada PBT?", "Jika premis makanan, adakah telah mendapat perakuan FOSIM? *", "Jika skim kosmetik, adakah telah mendapat perakuan NPRA? *"]},
             { id: 'premis', title: '5. Premis', type: 'qa', description: 'Soalan berkaitan lokasi, struktur, dan pelan lantai premis.'},
             { id: 'bahan', title: '6. Bahan Mentah & Peralatan', type: 'qa', description: 'Soalan berkaitan bahan mentah, penyimpanan, dan peralatan.'},
             { id: 'sanitasi', title: '7. Sanitasi', type: 'qa', description: 'Soalan berkaitan kebersihan dan kawalan makhluk perosak.'},
@@ -505,7 +506,25 @@
             const step = flowSteps[window.appState.currentStep];
             const currentAnswers = window.appState.answers;
             let html = `<h2 class="text-2xl font-bold mb-2">${step.title}</h2><p class="text-md text-gray-600 mb-6">${step.description}</p>`;
-            if (step.type === 'checklist' || step.type === 'qa') {
+            
+            if (step.id === 'syarat') {
+                html += '<div class="space-y-6">';
+                step.questions.forEach((question, index) => {
+                    const id = `${step.id}_${index}`;
+                    const answer = currentAnswers[id] || '';
+                    html += `<div class="bg-white p-5 rounded-xl shadow-lg border-t-4 border-teal-500/50"><p class="font-medium mb-3">${index + 1}. ${question}</p><div class="flex flex-wrap gap-3">${['YA', 'TIDAK'].map(option => `<button onclick="window.handleAnswer('${id}', '${option}', true)" class="px-5 py-2 rounded-full text-sm font-semibold transition ${answer === option ? 'bg-teal-600 text-white shadow-md' : 'bg-gray-100 hover:bg-teal-100'}">${option}</button>`).join('')}</div></div>`;
+                });
+                html += '</div>';
+
+                // Add footnotes for FoSIM and NPRA
+                html += `
+                    <div class="mt-8 pt-4 border-t border-gray-200 text-sm text-gray-600 space-y-2">
+                        <p><strong>* FoSIM:</strong> (Food Safety Information System of Malaysia) - Sistem pendaftaran premis makanan online di bawah Kementerian Kesihatan Malaysia (KKM).</p>
+                        <p><strong>* NPRA:</strong> (National Pharmaceutical Regulatory Agency) - Agensi Regulatori Farmasi Negara, bertanggungjawab untuk pendaftaran produk kosmetik dan farmaseutikal di Malaysia.</p>
+                    </div>
+                `;
+            }
+            else if (step.type === 'checklist' || step.type === 'qa') {
                 const questions = step.type === 'checklist' ? step.questions : qaQuestions[step.id];
                 html += '<div class="space-y-6">';
                 questions.forEach((question, index) => {
@@ -516,11 +535,31 @@
                 });
                 html += '</div>';
             } else if (step.type === 'selection') {
-                html += '<div class="space-y-4">';
+                 html += '<div class="space-y-4">';
                 step.options.forEach((question, index) => {
                     const id = `${step.id}_${index}`;
                     const isChecked = currentAnswers[id] === 'YA';
-                    html += `<label for="${id}" class="flex items-start p-4 bg-white rounded-xl shadow-sm hover:shadow-md cursor-pointer w-full"><input type="radio" name="${step.id}" id="${id}" value="YA" ${isChecked ? 'checked' : ''} onchange="window.handleAnswer('${id}', 'YA', true)" class="mt-1 h-5 w-5 text-teal-600 border-gray-300 rounded focus:ring-2 focus:ring-teal-500 flex-shrink-0"><span class="ml-3">${question}</span></label>`;
+
+                    let isDisabled = false;
+                    let labelClasses = "flex items-start p-4 bg-white rounded-xl shadow-sm hover:shadow-md cursor-pointer transition duration-150 w-full";
+                    let inputAttributes = `type="radio" name="${step.id}" id="${id}" value="YA" ${isChecked ? 'checked' : ''} onchange="window.handleAnswer('${id}', 'YA', true)" class="mt-1 h-5 w-5 text-teal-600 border-gray-300 rounded focus:ring-2 focus:ring-teal-500 flex-shrink-0"`;
+                    let spanClasses = "ml-3 text-gray-700";
+                    let disabledText = '';
+
+                    if (step.id === 'kategori' && (index === 2 || index === 3)) {
+                        isDisabled = true;
+                        labelClasses = "flex items-start p-4 bg-gray-100 rounded-xl shadow-sm cursor-not-allowed transition duration-150 w-full opacity-60";
+                        inputAttributes = `type="radio" name="${step.id}" id="${id}" value="YA" disabled class="mt-1 h-5 w-5 text-gray-400 border-gray-300 rounded flex-shrink-0"`;
+                        spanClasses = "ml-3 text-gray-500";
+                        disabledText = '<span class="ml-2 text-xs font-semibold text-gray-500">(Tidak Aktif)</span>';
+                    }
+
+                    html += `
+                        <label for="${id}" class="${labelClasses}">
+                            <input ${inputAttributes}>
+                            <span class="${spanClasses}">${question}${disabledText}</span>
+                        </label>
+                    `;
                 });
                 html += '</div>';
             } else if (step.type === 'form') {
