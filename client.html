@@ -1,0 +1,1717 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semakan Jurang Halal (eHalalGAP)</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load html2pdf.js for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Load Chart.js for visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        /* Custom styles for professional look and font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+        }
+        .hero-bg {
+            background-color: #1a4f78; /* Deep professional blue */
+        }
+        .btn-primary {
+            background-color: #0d9488; /* Teal/Turquoise for action */
+            transition: background-color 0.3s;
+        }
+        .btn-primary:hover {
+            background-color: #0f766e;
+        }
+        .btn-secondary {
+            background-color: #e5e7eb;
+            color: #374151;
+            transition: background-color 0.3s;
+        }
+        .btn-secondary:hover {
+            background-color: #d1d5db;
+        }
+        .tab-active {
+            border-bottom: 4px solid #0d9488;
+            color: #0d9488;
+            font-weight: 600;
+        }
+        /* Custom CSS for Progress Bar (Doughnut Chart Style) */
+        .progress-ring {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: conic-gradient(#0d9488 0%, #0d9488 var(--progress), #e5e7eb var(--progress), #e5e7eb 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .progress-ring-inner {
+            width: 90px;
+            height: 90px;
+            background-color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #0d9488;
+        }
+        /* Style for PDF container to ensure clean output */
+        #pdf-content-container {
+            padding: 30px;
+            background-color: white;
+            color: black;
+            font-family: 'Inter', sans-serif;
+        }
+        /* New custom CSS for unconstrained logo size, ensuring responsiveness */
+        .logo-img {
+            max-width: 100%; /* Ensures it scales down on mobile if too large */
+            height: auto;
+            display: block;
+        }
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        .modal-content {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            width: 95%;
+            max-width: 1200px;
+            max-height: 95vh;
+            overflow-y: auto;
+            position: relative;
+        }
+    </style>
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, setLogLevel, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- GLOBAL FIREBASE VARIABLES (MANDATORY USE) ---
+        // MENGGANTI konfigurasi persekitaran dengan konfigurasi baharu yang disediakan.
+        const APP_FIREBASE_CONFIG = {
+            apiKey: "AIzaSyCll1mrRqrAMAUqzdGqSYSyFBiOpb6y_y4",
+            authDomain: "ehalalgap.firebaseapp.com",
+            projectId: "ehalalgap",
+            storageBucket: "ehalalgap.firebasestorage.app",
+            appId: "1:687151615169:web:8ff94f1eed2c6d1d5f1840",
+            measurementId: "G-6QBXVD6R0R"
+        };
+        
+        // Menggunakan nilai daripada konfigurasi baharu
+        const appId = APP_FIREBASE_CONFIG.projectId; // Menggunakan ProjectId 'ehalalgap' untuk pathing Firestore
+        const firebaseConfig = APP_FIREBASE_CONFIG;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; 
+        // ----------------------------------------------------
+
+        // Global Firebase instances
+        let app = null;
+        window.db = null;
+        window.auth = null;
+
+        // Initialize App State. Removed score/total metrics as they are calculated on demand.
+        window.appState = {
+            isAuthenticated: false,
+            authReady: false,
+            userId: null,
+            currentStep: 0,
+            answers: {},
+            // NEW: Payment status for PDF download
+            isPaidClient: false, 
+            isRegisterMode: false // NEW: Control display between Login and Register form
+        };
+
+        // Global Chart variable (to destroy previous instance)
+        let pieChartInstance = null;
+
+        // All questionnaire and flow data - UPDATED with new UMUM/Syarat Kelayakan questions
+        const flowSteps = [
+            { id: 'maklumat', title: '1. Maklumat Syarikat', type: 'form', description: 'Sila isikan maklumat asas syarikat anda.'}, // Index 0
+            { id: 'syarat', title: '2. Syarat Kelayakan', type: 'checklist', description: 'Sila semak sama ada syarikat anda memenuhi syarat-syarat asas ini.', questions: [
+                "Adakah syarikat berdaftar dengan Suruhanjaya Syarikat Malaysia (SSM)?",
+                "Adakah syarikat Telah beroperasi sepenuhnya sekurang-kurangnya 3 bulan?",
+                "Adakah syarikat Memiliki lesen atau kelulusan daripada PBT?",
+                "Jika premis makanan, adakah telah mendapat perakuan FOSIM? *",
+                "Jika skim kosmetik, adakah telah mendapat perakuan NPRA? *",
+            ]}, // Index 1 - UPDATED QUESTIONS
+            { id: 'kategori', title: '3. Kategori Industri', type: 'selection', description: 'Sila pilih **salah satu** kategori industri syarikat anda.', options: [
+                'Mikro (Jualan Tahunan < RM300,000 ATAU Pekerja < 5 orang)',
+                'Kecil (Jualan Tahunan RM300,000 - RM 15 juta ATAU Pekerja 5 - 75 orang)',
+                'Sederhana (Jualan Tahunan RM 15 juta - RM 50 juta ATAU Pekerja 75 - 200 orang)',
+                'Besar (Jualan Tahunan > RM 50 juta ATAU Pekerja > 200 orang)'
+            ]}, // Index 2 
+            { id: 'skim', title: '4. Skim Pensijilan', type: 'selection', description: 'Sila pilih **salah satu** skim pensijilan Halal yang berkaitan dengan jenis perniagaan anda.', options: [
+                'Produk Makanan dan Minuman', 'Produk Kosmetik', 'Produk Farmaseutikal', 'Premis Makanan',
+                'Produk Barang Gunaan', 'Perkhidmatan Logistik', 'Rumah Sembelihan', 'Pengilangan Kontrak/OEM',
+                'Produk Peranti Perubatan'
+            ]}, // Index 3
+            { id: 'premis', title: '5. Premis', type: 'qa', description: 'Soalan berkaitan lokasi, struktur, dan pelan lantai premis.'}, // Index 4
+            { id: 'bahan', title: '6. Bahan Mentah & Peralatan', type: 'qa', description: 'Soalan berkaitan bahan mentah, penyimpanan, dan peralatan.'}, // Index 5
+            { id: 'sanitasi', title: '7. Sanitasi', type: 'qa', description: 'Soalan berkaitan kebersihan dan kawalan makhluk perosak.'}, // Index 6
+            { id: 'pekerja', title: '8. Pekerja', type: 'qa', description: 'Soalan berkaitan pekerja dan latihan halal.'}, // Index 7
+            { id: 'dokumentasi', title: '9. Dokumentasi & Rekod', type: 'qa', description: 'Soalan berkaitan sistem dokumentasi dan rekod syarikat.'}, // Index 8
+            { id: 'ulasan', title: '10. Ulasan', type: 'textarea', description: 'Sila kongsikan pandangan dan cabaran utama anda.' }, // Index 9 - NEW
+            { id: 'result', title: '11. Keputusan & Laporan', type: 'result', description: 'Laporan Kesediaan Halal JAKIM anda.' } // Index 10
+        ];
+
+        // Combined Q/A Data for scored sections
+        const qaQuestions = {
+            premis: [
+                "Adakah premis anda terletak jauh dari dan tidak dicemari oleh ladang babi atau aktiviti pemprosesan tidak halal?",
+                "Adakah premis bebas daripada bahan mentah dan produk tidak halal seperti arak dan daging babi?",
+                "Adakah premis mempunyai mekanisme pengawalan bagi mencegah haiwan peliharaan atau liar, serangga dan haiwan perosak daripada memasuki atau berada di dalam kawasan premis?",
+                "Adakah premis dalam keadaan baik, bersih dan kemas?",
+                "Adakah lantai, dinding, siling, kipas, penghawa dingin, tingkap dan pintu berkeadaan bersih dan tidak menyumbang kepada pencemaran?",
+                "Adakah bekalan air terawat dari Jabatan Bekalan Air (potable water) mencukupi dan dilindungi daripada pencemaran?",
+                "Adakah ruang simpanan bahan mentah dipisahkan daripada ruang simpanan produk siap?",
+                "Adakah terdapat kemudahan sinki untuk basuh tangan yang dilengkapi dengan sabun dan tuala pakai buang/pengering tangan?",
+                "Adakah lantai diperbuat daripada bahan kalis air, tidak menyerap dan mudah dibersihkan?",
+                "Adakah terdapat sistem saliran air yang baik pada lantai pemprosesan?",
+                "Adakah dinding premis licin, kalis air, dan mudah dicuci?",
+                "Adakah siling atau bahagian atas premis direka untuk elak habuk jatuh, kulapuk dan titisan air?",
+                "Adakah pintu premis diperbuat daripada bahan kalis air, mudah dibersihkan, dan ditutup secara kendiri?",
+                "Adakah tingkap yang boleh dibuka dilengkapi dengan jaring/mosquito net untuk elak serangga masuk?",
+                "Adakah pencahayaan di kawasan pemprosesan mencukupi dan tidak menyebabkan risiko pencemaran makanan?",
+                "Adakah lampu yang berpenutup digunakan di kawasan pemprosesan?",
+                "Adakah sistem pengudaraan premis berfungsi baik dan aliran udara bergerak dari kawasan bersih ke kawasan kurang bersih (bukan sebaliknya)?",
+                "Adakah bilik air/tandas disediakan dalam jumlah mencukupi?",
+                "Adakah bilik air/tandas tidak terus bersambung dengan ruang pemprosesan makanan?",
+                "Adakah premis mempunyai stor yang berasingan untuk Bahan mentah?",
+                "Adakah premis mempunyai stor yang berasingan untuk Produk siap?",
+                "Adakah premis mempunyai stor yang berasingan untuk Bahan kimia/pembersihan?",
+                "Adakah premis menyediakan ruang solat kepada pekerja muslim?",
+                "Adakah premis menyediakan ruang persalinan kepada pekerja?",
+                "Adakah premis menyediakan ruang makan atau rehat kepada pekerja?",
+                "Adakah premis menyediakan kemudahan penyimpanan barang peribadi kepada pekerja?",
+                "Adakah premis memastikan alat dan unsur penyembahan tidak berada dalam kawasan pemprosesan?",
+                "Adakah premis memastikan tempat tinggal pekerja tidak berada dalam kawasan pemprosesan?",
+                "Adakah aliran proses pengeluaran makanan dalam premis satu arah (linear flow)?",
+                "Adakah terdapat pemisahan kawasan bersih dan kawasan kotor untuk mengelakkan pencemaran?"
+            ],
+            bahan: [
+                "Adakah semua bahan mentah (termasuk bahan tambahan & bahan pembungkusan primer) mempunyai sijil halal yang sah?",
+                "Jika bahan mentah diimport, adakah ia daripada badan pensijilan halal luar negara yang diiktiraf JAKIM?",
+                "Adakah rekod pembelian bahan mentah (invois, delivery order) disimpan dan boleh diaudit?",
+                "Adakah terdapat sebarang bahan mentah daripada sumber syubhah/diragui?", // Soalan 4
+                "Adakah bahan mentah halal disimpan berasingan daripada bahan tidak halal/diragui?", 
+                "Adakah stor bahan mentah dilabel dengan jelas untuk elak kekeliruan (contoh: 'Halal Certified', 'Non-halal', 'Bahan Kimia')?"
+            ],
+            sanitasi: [
+                "Adakah terdapat sink untuk basuh tangan yang dilengkapi sabun, tisu/pengering automatik, dan air bersih?",
+                "Adakah terdapat jadual pembersihan dan sanitasi bertulis yang disediakan dan disemak?",
+                "Adakah tong sampah bertutup dan mudah dibersihkan digunakan dalam premis?",
+                "Adakah bilik air/tandas Bersih, tidak berbau dan tidak terbuka secara langsung kepada kawasan pemprosesan?",
+                "Adakah terdapat sistem kawalan makhluk perosak?"
+            ],
+            pekerja: [
+                "Adakah syarikat mempunyai pekerja muslim warganegara?",
+                "Adakah pekerja syarikat telah menerima latihan halal?"
+            ],
+            dokumentasi: [
+                "Adakah dokumen dan rekod disimpan dengan baik, dikemaskini dan mudah untuk dirujuk?",
+                "Adakah syarikat menyimpan rekod pembelian bahan mentah bersama sijil halal pembekal?"
+            ]
+        };
+
+        // NEW: Define point scores for each section's questions based on PEMARKAHAN.csv
+        // Total Max Score = 308
+        const questionPoints = {
+            // UMUM/SYARAT (5 Questions @ 7 points each = 35 total)
+            'syarat': [7, 7, 7, 7, 7], 
+            
+            // PREMIS (30 questions, total 188) - Derived from GAP Analisis (2).xlsx - Premis.csv
+            'premis': [7, 7, 5, 3, 7, 7, 7, 7, 7, 7, 7, 7, 7, 5, 5, 7, 7, 5, 7, 7, 7, 7, 7, 7, 5, 3, 7, 5, 7, 7], 
+
+            // BAHAN MENTAH & PERALATAN (6 questions, total 40) - Derived from GAP Analisis (2).xlsx - Bahan Mentah.Peralatan.csv
+            'bahan': [7, 7, 7, 7, 7, 5], 
+
+            // SANITASI (5 questions, total 23) - Derived from GAP Analisis (2).xlsx - Sanitasi.csv
+            'sanitasi': [5, 5, 3, 5, 5], 
+
+            // PEKERJA (2 questions, total 12) - Derived from GAP Analisis (2).xlsx - Pekerja.csv
+            'pekerja': [7, 5], 
+
+            // DOKUMENTASI & REKOD (2 questions, total 10) - Derived from GAP Analisis (2).xlsx - Dokumentasi.Rekod.csv
+            'dokumentasi': [5, 5] 
+        };
+
+        // Helper to get Firestore document reference for private data
+        const getClientDocRef = (userId) => {
+            // Private path
+            const collectionPath = `/artifacts/${appId}/users/${userId}/halal_readiness_assessment`;
+            return doc(window.db, collectionPath, 'data');
+        };
+        
+        // NEW: Helper to get Firestore document reference for public summary
+        const getPublicSummaryDocRef = (userId) => {
+            // FIX: Using 'clients' collection name to match the user's Firestore Security Rules
+            const collectionPath = `/artifacts/${appId}/public/data/clients`; 
+            return doc(window.db, collectionPath, userId);
+        };
+        
+        // NEW: Function to save a summary of the assessment to a public collection
+        const savePublicSummary = async (userId, dataToSave, score) => {
+            try {
+                const docRef = getPublicSummaryDocRef(userId);
+                
+                // Extract key information for public view
+                const clientName = dataToSave.answers['nama_syarikat'] || 'Client Baru';
+                const currentStep = dataToSave.currentStep;
+                const totalSteps = flowSteps.length;
+                const progressPercentage = (currentStep / totalSteps) * 100;
+                
+                const summaryData = {
+                    userId: userId,
+                    clientName: clientName,
+                    currentStepTitle: flowSteps[currentStep].title,
+                    currentStepIndex: currentStep,
+                    totalSteps: totalSteps,
+                    progressPercentage: progressPercentage.toFixed(0),
+                    readinessScore: score.readinessScore.toFixed(2),
+                    totalPointsScored: score.totalPointsScored, // NEW: Include scored points
+                    lastUpdated: new Date().toISOString()
+                };
+                
+                await setDoc(docRef, summaryData, { merge: true });
+            } catch (error) {
+                // LOG: Adding userId to log the context of the permission error
+                console.error("Error saving public summary for client", userId, ":", error); 
+                // The error indicates insufficient permissions (Security Rules Issue)
+            }
+        };
+
+
+        // Function to update local state and save to Firestore
+        window.updateState = async (newState) => {
+            // Merge new state with existing state
+            window.appState = { ...window.appState, ...newState };
+
+            // Render UI based on new state
+            window.renderApp();
+            
+            const currentStep = window.appState.currentStep;
+            const score = window.calculateScore(); // Recalculate score
+
+            // Save data to Firestore if authenticated and the new state includes answers/companyInfo
+            if (window.appState.authReady && window.appState.isAuthenticated && window.appState.userId) {
+                try {
+                    const privateDocRef = getClientDocRef(window.appState.userId);
+                    const dataToSave = {
+                        currentStep: currentStep,
+                        answers: window.appState.answers,
+                    };
+                    
+                    // Use setTimeout to defer Firestore writing slightly, minimizing potential stack exhaustion
+                    setTimeout(async () => {
+                        // 1. Save Private Data (Permitted by Peraturan 1)
+                        await setDoc(privateDocRef, dataToSave, { merge: true });
+                        
+                        // 2. Save Public Summary for Consultant View (Permitted by Peraturan 2)
+                        await savePublicSummary(window.appState.userId, dataToSave, score);
+
+                    }, 0);
+                    
+                } catch (error) {
+                    console.error("Error saving data to Firestore:", error);
+                }
+            }
+        };
+
+        // NEW: Function for manual save feedback
+        window.manualSave = () => {
+            // Re-triggering updateState will ensure data is queued for saving, even if no state changes occurred.
+            window.updateState({}); 
+
+            const statusMessage = document.getElementById('save-status-message');
+            if (statusMessage) {
+                const timestamp = new Date().toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit' });
+                statusMessage.textContent = `✅ Kemajuan Disimpan: ${timestamp}`;
+                // Show the message
+                statusMessage.classList.remove('opacity-0', 'text-gray-500');
+                statusMessage.classList.add('opacity-100', 'text-teal-600', 'font-medium');
+                
+                // Hide the message after 3 seconds
+                setTimeout(() => {
+                    statusMessage.classList.remove('opacity-100', 'text-teal-600', 'font-medium');
+                    statusMessage.classList.add('opacity-0', 'text-gray-500');
+                }, 3000);
+            }
+        };
+        
+        // NEW: Logout Function
+        window.logoutClient = async () => {
+            if (window.auth) {
+                try {
+                    await signOut(window.auth);
+                    // Redirect to the landing page after successful sign out
+                    window.location.href = 'index.html'; 
+                } catch (error) {
+                    console.error("Error signing out:", error);
+                    alert("Gagal log keluar. Sila cuba lagi.");
+                }
+            }
+        };
+
+        // NEW: Email/Password Authentication Handlers
+        window.handleAuth = async (isRegister) => {
+            if (!window.auth) {
+                 console.error("Authentication failed: Firebase Auth not initialized.");
+                 document.getElementById('auth-error-message').textContent = "Ralat sistem: Gagal memulakan perkhidmatan log masuk.";
+                 return;
+            }
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorMessageElement = document.getElementById('auth-error-message');
+            errorMessageElement.textContent = '';
+
+            if (!email || !password) {
+                errorMessageElement.textContent = "Sila masukkan emel dan kata laluan.";
+                return;
+            }
+            
+            // Basic email validation
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                errorMessageElement.textContent = "Sila masukkan format emel yang sah.";
+                return;
+            }
+
+            try {
+                if (isRegister) {
+                    // Register New User
+                    await createUserWithEmailAndPassword(window.auth, email, password);
+                } else {
+                    // Sign In Existing User
+                    await signInWithEmailAndPassword(window.auth, email, password);
+                }
+                // onAuthStateChanged will handle the rest
+            } catch (error) {
+                console.error("Authentication failed:", error);
+                let displayMessage = "Gagal log masuk. Sila cuba lagi.";
+                
+                if (error.code === 'auth/operation-not-allowed') {
+                    // Ralat ini menunjukkan kaedah Emel/Kata Laluan belum diaktifkan di Console.
+                    displayMessage = "Ralat Konfigurasi: Log Masuk Emel/Kata Laluan belum diaktifkan. Sila aktifkan di Konsol Firebase anda (Authentication -> Sign-in Method).";
+                } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+                    displayMessage = "Emel atau kata laluan tidak sah.";
+                } else if (error.code === 'auth/email-already-in-use') {
+                    displayMessage = "Emel ini sudah berdaftar. Sila Log Masuk.";
+                    window.updateState({ isRegisterMode: false }); // Switch to login view
+                    return; // Prevent showing message on the wrong view
+                } else if (error.code === 'auth/invalid-email') {
+                    displayMessage = "Format emel tidak sah.";
+                } else if (error.code === 'auth/weak-password') {
+                    displayMessage = "Kata laluan terlalu lemah (minimum 6 aksara).";
+                }
+                
+                errorMessageElement.textContent = displayMessage;
+            }
+        };
+
+        // Auth and Firestore Initialization
+        window.onload = async () => {
+            if (!firebaseConfig) {
+                console.error("Firebase config is missing.");
+            } else {
+                try {
+                    app = initializeApp(firebaseConfig);
+                    window.db = getFirestore(app);
+                    window.auth = getAuth(app);
+                    // setLogLevel('debug'); // Uncomment for debugging
+
+                    onAuthStateChanged(window.auth, async (user) => {
+                        if (user) {
+                            const userId = user.uid;
+                            // Update state only once here to set auth flags and user ID
+                            window.appState = { ...window.appState, isAuthenticated: true, userId: userId, authReady: true };
+                            console.log("Authenticated with user ID:", userId);
+
+                            // Load data from Firestore via onSnapshot (real-time listener)
+                            const docRef = getClientDocRef(userId);
+                            onSnapshot(docRef, (docSnap) => {
+                                if (docSnap.exists()) {
+                                    const data = docSnap.data();
+                                    console.log("Data loaded from Firestore:", data);
+                                    // Use direct assignment + render to avoid recursion from updateState
+                                    window.appState = {
+                                        ...window.appState,
+                                        currentStep: data.currentStep || 0,
+                                        answers: data.answers || {},
+                                    };
+                                    window.renderApp();
+                                } else {
+                                    console.log("No existing data found for this user.");
+                                    window.renderApp(); // Render with default state if no data exists
+                                }
+                            }, (error) => {
+                                console.error("Error setting up onSnapshot:", error);
+                                window.renderApp();
+                            });
+
+                        } else {
+                            window.appState = { ...window.appState, isAuthenticated: false, authReady: true };
+                            window.renderApp(); // Show login screen
+                        }
+                    });
+
+                    window.appState = { ...window.appState, authReady: true };
+                    window.renderApp(); 
+
+                } catch (error) {
+                    console.error("Firebase initialization or sign-in failed:", error);
+                    window.appState = { ...window.appState, authReady: true };
+                    window.renderApp();
+                }
+            }
+            // Ensure initial render happens after basic state initialization
+            window.renderApp(); 
+        };
+
+        // --- Core Application Logic ---
+        
+        // This function calculates score and breakdown (Ya, Tidak, Tidak Pasti counts)
+        window.calculateScore = () => {
+            // NEW: Maximum total score based on weighted scoring (35+188+40+23+12+10 = 308)
+            const MAX_TOTAL_POINTS = 308;
+            let totalPointsScored = 0;
+            let totalScoredQuestions = 0; 
+            let totalAnswered = 0;
+            let countYa = 0;
+            let countTidak = 0;
+            let countTidakPasti = 0;
+
+            // Define the sections that contribute to the weighted score
+            const scoredSections = ['syarat', 'premis', 'bahan', 'sanitasi', 'pekerja', 'dokumentasi'];
+            
+            // Define point scores for each section's questions (derived from GAP Analisis (2).xlsx)
+            const pointsData = questionPoints;
+
+
+            scoredSections.forEach(sectionId => {
+                // Get the questions for this section
+                const questions = (sectionId === 'syarat') 
+                    ? flowSteps.find(s => s.id === 'syarat').questions 
+                    : qaQuestions[sectionId];
+                
+                const points = pointsData[sectionId] || [];
+                totalScoredQuestions += questions.length;
+
+                questions.forEach((q, index) => {
+                    const questionKey = `${sectionId}_${index}`;
+                    const answer = window.appState.answers[questionKey];
+                    const pointValue = points[index] || 0; // The point score for a 'YA' answer
+
+                    if (answer) {
+                        totalAnswered++;
+
+                        let isReadyAnswer = (answer === 'YA');
+
+                        // Inverted scoring logic check (Q4 & Q5 in Bahan Mentah: TIDAK = READY)
+                        if (sectionId === 'bahan' && (index === 3 || index === 4)) { 
+                            isReadyAnswer = (answer === 'TIDAK');
+                        }
+
+                        if (isReadyAnswer) {
+                            totalPointsScored += pointValue;
+                            countYa++;
+                        } else if (answer === 'TIDAK') {
+                            countTidak++;
+                        } else if (answer === 'TIDAK PASTI') {
+                            countTidakPasti++;
+                        }
+                    }
+                });
+            });
+
+            const readinessScore = MAX_TOTAL_POINTS > 0 ? (totalPointsScored / MAX_TOTAL_POINTS) * 100 : 0;
+            
+            return { 
+                totalQuestions: MAX_TOTAL_POINTS, // Max Points (Denominator for Score %)
+                totalAnswered: totalAnswered, // Number of individual questions answered (0-50)
+                totalPointsScored: totalPointsScored, // Points scored (0-308)
+                totalScoredQuestions: totalScoredQuestions, // Total number of individual questions (50)
+                readinessScore: parseFloat(readinessScore.toFixed(2)),
+                answerBreakdown: {
+                    ya: countYa,
+                    tidak: countTidak,
+                    tidakPasti: countTidakPasti, 
+                    notAnswered: totalScoredQuestions - totalAnswered // For pie chart (based on 50 questions)
+                }
+            };
+        };
+        
+        // Function to check if all eligibility requirements are met (i.e., all 'YA') for Step 2 (New Index 1)
+        window.isEligibilityMet = () => {
+            // Note: Syarat Kelayakan is now at index 1 in flowSteps
+            const syaratQuestions = flowSteps.find(step => step.id === 'syarat').questions;
+            
+            for (let i = 0; i < syaratQuestions.length; i++) {
+                const questionKey = `syarat_${i}`;
+                const answer = window.appState.answers[questionKey];
+                if (answer !== 'YA') {
+                    return false;
+                }
+            }
+            return true;
+        };
+
+        // Function to check if Maklumat Syarikat has mandatory fields filled (Step 0)
+        window.isCompanyInfoComplete = () => {
+            const requiredFields = ['nama_syarikat', 'no_ssm_jika_ada', 'alamat', 'no_telefon']; // Define mandatory fields
+            const answers = window.appState.answers;
+            
+            for (const fieldId of requiredFields) {
+                const value = answers[fieldId];
+                // Check if value is null/undefined OR if it's an empty string or only whitespace
+                if (!value || String(value).trim() === '') { 
+                    return false;
+                }
+            }
+            return true;
+        };
+
+        // NEW: Function to check if at least one selection is made for Steps 3 and 4
+        window.isSelectionMade = (stepId) => {
+            const step = flowSteps.find(s => s.id === stepId);
+            if (!step || step.type !== 'selection') return true; // Skip if not a selection step
+            
+            for (let i = 0; i < step.options.length; i++) {
+                const questionKey = `${stepId}_${i}`;
+                if (window.appState.answers[questionKey] === 'YA') {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+
+        // --- GEMINI AI INTEGRATION ---
+        window.getGeminiSummary = async (score) => {
+            // 1. Prepare Data for Prompt
+            const totalMaxPoints = 308; // Fixed max points
+            const pointsScored = score.totalPointsScored;
+            const progress = score.readinessScore;
+            const breakdown = score.answerBreakdown;
+            const answers = window.appState.answers;
+            const qaSections = ['syarat', 'premis', 'bahan', 'sanitasi', 'pekerja', 'dokumentasi'];
+            
+            // Determine overall status
+            let status = '';
+            if (progress >= 80) { status = 'Bersedia'; } 
+            else if (progress >= 60) { status = 'Kurang Bersedia'; } 
+            else { status = 'Tidak Bersedia'; }
+
+            let promptData = `Analisis Kesediaan Pensijilan Halal (eHalalGAP) Syarikat:\n\n`;
+            promptData += `STATUS KESELURUHAN: ${status} (${progress.toFixed(0)}% Skor Kesediaan | ${pointsScored} dari ${totalMaxPoints} mata)\n`;
+            promptData += `Jumlah Soalan Dijawab: ${breakdown.ya + breakdown.tidak + breakdown.tidakPasti}, Dijawab YA: ${breakdown.ya}, TIDAK: ${breakdown.tidak}, TIDAK PASTI: ${breakdown.tidakPasti}.\n\n`;
+            promptData += `Analisis Bahagian (Berdasarkan Mata Berwajaran):\n`;
+
+            // Append section readiness analysis
+            qaSections.forEach(sectionId => {
+                const questions = (sectionId === 'syarat') 
+                    ? flowSteps.find(s => s.id === 'syarat').questions 
+                    : qaQuestions[sectionId];
+                
+                const points = questionPoints[sectionId] || [];
+
+                let secMaxPoints = 0;
+                let secPointsScored = 0;
+                let secTidakCount = 0;
+                
+                points.forEach(p => { secMaxPoints += p; });
+
+                questions.forEach((q, index) => {
+                    const questionKey = `${sectionId}_${index}`;
+                    const answer = answers[questionKey];
+                    const pointValue = points[index] || 0; 
+
+                    if (answer) {
+                        let isReadyAnswer = (answer === 'YA');
+                        if (sectionId === 'bahan' && (index === 3 || index === 4)) { isReadyAnswer = (answer === 'TIDAK'); }
+
+                        if (isReadyAnswer) { 
+                            secPointsScored += pointValue;
+                        } else if (answer === 'TIDAK') {
+                            secTidakCount++;
+                        }
+                    }
+                });
+
+                const secPercentage = secMaxPoints > 0 ? (secPointsScored / secMaxPoints) * 100 : 0;
+                const stepObject = flowSteps.find(s => s.id === sectionId);
+                const secTitle = stepObject ? stepObject.title.replace(/^\d+\.\s*/, '') : sectionId; 
+                
+                promptData += `- ${secTitle}: Skor ${secPointsScored}/${secMaxPoints} (${secPercentage.toFixed(0)}%). Jawapan TIDAK (GAP): ${secTidakCount}\n`;
+            });
+            
+            // 2. Set up API call
+            const systemPrompt = `Anda adalah Juruanalisis Pematuhan Halal yang pakar. Berdasarkan data analisis jurang (GAP analysis) di bawah, hasilkan ringkasan profesional, padat, dan bertindak (actionable summary) dalam **Bahasa Melayu** untuk klien. 
+            Ringkasan anda perlu merangkumi:
+            1. Status keseluruhan kesediaan syarikat dan skor mata berwajaran.
+            2. Bahagian mana yang mempunyai kekuatan (skor tinggi >80%) dan jumlah mata yang diperoleh.
+            3. Bahagian mana yang paling memerlukan perhatian segera (skor rendah atau jumlah jawapan 'TIDAK' yang tinggi).
+            4. 1-2 nasihat langkah seterusnya yang kritikal untuk mencapai pensijilan.
+            Format output dalam satu perenggan yang padat atau dua perenggan maksima. Gunakan bahasa yang meyakinkan dan profesional. Jangan gunakan format senarai atau sebarang tajuk.`;
+
+            const userQuery = `Sila analisis data penilaian kesediaan Halal berikut:\n${promptData}`;
+            
+            const apiKey = ""; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+            };
+
+            // 3. Fetch Data with Retry Logic
+            let responseText = "Gagal menjana ringkasan AI. Sila cuba sebentar lagi.";
+            let retries = 3;
+            const initialDelay = 1000;
+
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                    if (text) {
+                        responseText = text;
+                        break; // Success
+                    }
+                } catch (error) {
+                    console.error(`Attempt ${i + 1} failed:`, error);
+                    if (i < retries - 1) {
+                        await new Promise(resolve => setTimeout(resolve, initialDelay * Math.pow(2, i)));
+                    }
+                }
+            }
+
+            return responseText;
+        };
+        // --- END GEMINI AI INTEGRATION ---
+
+        // NEW: Function to render the GAP Analysis Table (Used in PDF/Modal)
+        window.renderGapsTable = (answers, scoredSections) => {
+            let gapHtml = '';
+            const allGaps = [];
+            const flowStepsMap = flowSteps.reduce((map, step) => {
+                if (step.type === 'qa' || step.type === 'checklist') {
+                    map[step.id] = step;
+                }
+                return map;
+            }, {});
+
+
+            scoredSections.forEach(sectionId => {
+                const questions = (sectionId === 'syarat') 
+                    ? flowSteps.find(s => s.id === 'syarat').questions 
+                    : qaQuestions[sectionId];
+                
+                const points = questionPoints[sectionId] || [];
+                const stepObject = flowStepsMap[sectionId];
+                const secTitle = stepObject ? stepObject.title.replace(/^\d+\.\s*/, '') : 'Bahagian Tidak Diketahui'; 
+                
+                questions.forEach((q, index) => {
+                    const answer = answers[`${sectionId}_${index}`];
+                    const pointValue = points[index] || 0;
+                    
+                    let isGap = false;
+                    
+                    // Default GAP condition: Answer is 'TIDAK' or 'TIDAK PASTI'
+                    if (answer === 'TIDAK' || answer === 'TIDAK PASTI') {
+                        isGap = true;
+                    }
+
+                    // Special case for 'bahan' questions 4 & 5 (index 3 & 4)
+                    if (sectionId === 'bahan' && (index === 3 || index === 4)) {
+                        // For these questions, a GAP is when the answer is 'YA'.
+                        // We reset 'isGap' and check only for 'YA'.
+                        isGap = (answer === 'YA');
+                    }
+                    
+                    if (isGap) {
+                        allGaps.push({
+                            section: secTitle,
+                            question: q.replace(/\*/g, '').trim(), // Clean up question text
+                            pointValue: pointValue,
+                        });
+                    }
+                });
+            });
+
+            if (allGaps.length === 0) {
+                return '<p class="text-sm text-green-600 p-4 border rounded-lg border-green-200 bg-green-50">Tiada jurang kritikal dikesan. Klien telah mencapai tahap kesediaan yang tinggi.</p>';
+            }
+
+            gapHtml = `
+                <div class="overflow-x-auto shadow-md rounded-lg">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bahagian</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Soalan Jurang (GAP)</th>
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Mata Hilang</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            ${allGaps.map((gap, index) => `
+                                <tr class="${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-red-50/50">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-700">${gap.section}</td>
+                                    <td class="px-6 py-4 text-sm text-gray-900">${gap.question}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-bold text-red-600">${gap.pointValue}</td>
+                                </tr>
+                            `).join('')}
+                            <tr class="bg-red-100/70 font-bold">
+                                <td colspan="2" class="px-6 py-3 text-right text-sm text-gray-800">Jumlah Mata Berwajaran Hilang:</td>
+                                <td class="px-6 py-3 text-center text-sm text-red-800">${allGaps.reduce((sum, gap) => sum + gap.pointValue, 0)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            return gapHtml;
+        }
+
+        // --- CHART RENDERING FUNCTION ---
+        window.renderPieChart = (answerBreakdown, canvasId) => {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+            
+            // Destroy any existing chart instance on this canvas
+            const existingChart = Chart.getChart(ctx);
+            if (existingChart) {
+                existingChart.destroy();
+            }
+
+            const chartData = {
+                // REMOVED 'TIDAK PASTI' from labels for a cleaner chart
+                labels: ['YA (Halal Ready)', 'TIDAK (Perlu Tindakan)', 'Belum Dijawab'],
+                datasets: [{
+                    // REMOVED answerBreakdown.tidakPasti from the data
+                    data: [answerBreakdown.ya, answerBreakdown.tidak, answerBreakdown.notAnswered],
+                    backgroundColor: [
+                        '#0d9488', // Teal (YA - Ready)
+                        '#dc2626', // Red (TIDAK - Action Needed)
+                        '#e5e7eb'  // Gray (Not Answered)
+                    ],
+                    hoverOffset: 4
+                }]
+            };
+
+            new Chart(ctx, {
+                type: 'pie',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: {
+                                    family: 'Inter',
+                                    size: 14
+                                }
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Analisis Jawapan Keseluruhan (Berdasarkan Bilangan Soalan)',
+                            font: {
+                                size: 18,
+                                family: 'Inter',
+                                weight: 'bold'
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed !== null) {
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = total > 0 ? (context.parsed / total * 100).toFixed(1) + '%' : '0%';
+                                        label += context.parsed + ` (${percentage})`;
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        };
+
+        // Function to update the AI Summary text after fetching
+        window.updateAiSummaryDisplay = (summaryText) => {
+            const container = document.getElementById('ai-summary-content');
+            if (container) {
+                container.innerHTML = `<p class="text-gray-700 text-base">${summaryText}</p>`;
+            }
+        };
+
+        // --- MODAL & PAYMENT GATE LOGIC ---
+        
+        // Function to control modal visibility
+        window.toggleModal = (show) => {
+            const modal = document.getElementById('report-modal');
+            if (modal) {
+                modal.style.display = show ? 'flex' : 'none';
+                if (show) {
+                    // Re-render report content inside modal every time it opens
+                    const modalBody = document.getElementById('modal-report-body');
+                    if (modalBody) {
+                        modalBody.innerHTML = window.renderReportContent();
+                        
+                        // Re-render chart inside the modal content with the correct ID
+                        setTimeout(() => {
+                            const score = window.calculateScore();
+                            if (score.totalAnswered > 0) {
+                                window.renderPieChart(score.answerBreakdown, 'modalReportPieChart');
+                            }
+                        }, 100);
+                    }
+                }
+            }
+        };
+
+        // Function to simulate payment and enable PDF download
+        window.handlePaymentGate = () => {
+            if (window.appState.isPaidClient) {
+                window.downloadPDF();
+            } else {
+                // Simulation of a simple payment requirement modal/message
+                const confirmed = confirm("Untuk memuat turun Laporan PDF, bayaran minima sebanyak RMXX.XX diperlukan. Adakah anda ingin meneruskan dan mengaktifkan fungsi Muat Turun (Simulasi Bayaran)?");
+                
+                if (confirmed) {
+                    // Simulate successful payment
+                    window.updateState({ isPaidClient: true });
+                    alert("Pembayaran Berjaya! Fungsi muat turun PDF kini diaktifkan. Sila klik butang 'Muat Turun Laporan' sekali lagi.");
+                }
+            }
+        };
+
+        // --- PDF Generation Function ---
+        window.downloadPDF = () => {
+            if (!window.appState.isPaidClient) {
+                 // Should be unreachable if handlePaymentGate is used correctly, but good for safety
+                alert("Sila lengkapkan bayaran untuk mengaktifkan fungsi Muat Turun PDF.");
+                return;
+            }
+
+            const element = document.getElementById('modal-report-body'); // Use modal content as PDF source
+            const score = window.calculateScore();
+            const filename = `Laporan_Semakan_Jurang_Halal_${score.readinessScore.toFixed(0)}%_${new Date().toISOString().slice(0, 10)}.pdf`;
+
+            // Configuration for html2pdf
+            const opt = {
+                margin: 1,
+                filename: filename,
+                image: { type: 'jpeg', quality: 0.98 },
+                // Increase scale for better image quality in PDF, but may take longer
+                html2canvas: { scale: 3, logging: true, useCORS: true }, 
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+
+            // Use html2pdf to generate and download the PDF
+            // The loading spinner will handle the wait time.
+            html2pdf().set(opt).from(element).save();
+        };
+
+
+        // --- Rendering Functions ---
+
+        window.renderLogin = () => {
+            const isRegister = window.appState.isRegisterMode;
+            
+            return `
+                <div class="h-screen flex items-center justify-center p-4">
+                    <div class="bg-white p-8 rounded-lg shadow-2xl w-full max-w-md">
+                        <h1 class="text-3xl font-bold mb-6 text-center text-gray-800">${isRegister ? 'Daftar Akaun Baharu' : 'Log Masuk Klien'}</h1>
+                        
+                        <div class="space-y-4">
+                            <input type="email" id="email" placeholder="Alamat Emel" required
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500" />
+                            
+                            <input type="password" id="password" placeholder="Kata Laluan (Min 6 Aksara)" required
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500" />
+
+                            <p id="auth-error-message" class="text-sm text-red-500 text-center"></p>
+
+                            <!-- Primary Action Button -->
+                            <button onclick="window.handleAuth(${isRegister})"
+                                class="w-full btn-primary py-3 rounded-xl text-white font-semibold shadow-md hover:shadow-lg">
+                                ${isRegister ? 'Daftar Sekarang' : 'Log Masuk'}
+                            </button>
+                            
+                            <!-- Toggle Link -->
+                            <p class="text-center text-sm mt-4">
+                                ${isRegister ? 
+                                    `Sudah ada akaun? <a href="#" onclick="window.updateState({ isRegisterMode: false })" class="text-teal-600 hover:text-teal-800 font-semibold">Log Masuk di sini</a>` :
+                                    `Belum mendaftar? <a href="#" onclick="window.updateState({ isRegisterMode: true })" class="text-teal-600 hover:text-teal-800 font-semibold">Daftar Akaun Baharu</a>`
+                                }
+                            </p>
+                        </div>
+
+                        <p class="mt-6 text-xs text-center">
+                            <a href="index.html" class="text-teal-600 hover:text-teal-800 font-medium">
+                                &larr; Kembali ke Halaman Utama
+                            </a>
+                        </p>
+                    </div>
+                </div>
+            `;
+        };
+
+        window.renderProgress = (score) => {
+            // Calculate progress based on answered QA questions
+            const totalScoredQuestions = score.totalScoredQuestions; // Total number of individual questions (50)
+            const percentageAnswered = totalScoredQuestions > 0 ? (score.totalAnswered / totalScoredQuestions) * 100 : 0;
+            const progressAnswered = percentageAnswered.toFixed(0);
+
+            return `
+                <!-- Updated container class to match introduction styling -->
+                <div class="mb-8 p-6 bg-white rounded-xl shadow-lg border-l-4 border-teal-500">
+                    <h3 class="text-xl font-semibold mb-4 text-gray-800">Kemajuan Penilaian</h3>
+                    
+                    <!-- New Tip Box -->
+                    <div class="bg-blue-50 border-l-4 border-blue-400 text-blue-700 p-4 mb-6 rounded-lg" role="alert">
+                        <p class="font-bold">Nota Penting:</p>
+                        <p class="text-sm">
+                            Sila jawab **semua soalan dengan jujur dan telus**. Penilaian Kendiri ini bertujuan untuk
+                            mengenal pasti jurang sebenar (GAP) syarikat anda. Jawapan yang tepat akan
+                            memudahkan proses konsultasi dan pensijilan Halal JAKIM di peringkat seterusnya.
+                        </p>
+                    </div>
+
+                    <!-- Centered Progress Layout (Simplified) -->
+                    <div class="flex flex-col items-center justify-center space-y-4">
+                        
+                        <!-- Progress for Answered Questions (Progress Ring - Centered) -->
+                        <div class="flex flex-col items-center">
+                            <div class="progress-ring" style="--progress: ${progressAnswered}%;">
+                                <div class="progress-ring-inner">
+                                    ${progressAnswered}%
+                                </div>
+                            </div>
+                            <p class="mt-4 text-lg text-gray-600 font-medium">Soalan Dijawab</p>
+                            <p class="mt-1 text-sm text-gray-500">(${score.totalAnswered} dari ${totalScoredQuestions} soalan)</p>
+                        </div>
+                        
+                    </div>
+                </div>
+            `;
+        };
+
+        // Renders the main content including the report data wrapped in the report-content div
+        window.renderTabContent = () => {
+            const step = flowSteps[window.appState.currentStep];
+            const currentAnswers = window.appState.answers;
+            let html = `<h2 class="text-2xl font-bold mb-2 text-gray-800">${step.title}</h2>
+                        <p class="text-md text-gray-600 mb-6">${step.description}</p>`;
+
+            if (step.id === 'syarat') {
+                // --- Syarat Kelayakan (UMUM) ---
+                const options = step.questions; 
+                html += '<div class="space-y-6">';
+                options.forEach((question, index) => {
+                    const id = `${step.id}_${index}`;
+                    const answer = currentAnswers[id] || '';
+                    html += `
+                        <div class="bg-white p-5 rounded-xl shadow-lg border-t-4 border-teal-500/50">
+                            <p class="font-medium text-gray-800 mb-3">${index + 1}. ${question}</p>
+                            <div class="flex flex-wrap gap-3">
+                                ${['YA', 'TIDAK'].map(option => `
+                                    <button onclick="window.handleAnswer('${id}', '${option}')"
+                                        class="px-5 py-2 rounded-full text-sm font-semibold transition duration-150
+                                        ${answer === option ? 'bg-teal-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-teal-100'}">
+                                        ${option}
+                                    </button>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                
+            } else if (step.type === 'selection') {
+                // --- Kategori Industri & Skim Pensijilan (Radio Buttons) ---
+                const options = step.options;
+                html += '<div class="space-y-4">';
+                options.forEach((question, index) => {
+                    const id = `${step.id}_${index}`;
+                    const isChecked = currentAnswers[id] === 'YA'; 
+                    html += `
+                        <!-- FIX: Added w-full to label and flex-shrink-0 to input for better sizing consistency -->
+                        <label for="${id}" class="flex items-start p-4 bg-white rounded-xl shadow-sm hover:shadow-md cursor-pointer transition duration-150 w-full">
+                            <input type="radio" name="${step.id}" id="${id}" value="YA" 
+                                ${isChecked ? 'checked' : ''} 
+                                onchange="window.handleAnswer('${id}', 'YA')"
+                                class="mt-1 h-5 w-5 text-teal-600 border-gray-300 rounded focus:ring-2 focus:ring-teal-500 flex-shrink-0">
+                            <span class="ml-3 text-gray-700">${question}</span>
+                        </label>
+                    `;
+                });
+                html += '</div>';
+                
+            } else if (step.type === 'form') {
+                // --- Maklumat Syarikat (Updated fields) ---
+                const fields = ['Nama Syarikat', 'No SSM (jika ada)', 'Alamat', 'No Telefon', 'Nama Pemilik', 'Jualan tahunan syarikat', 'Bilangan pekerja keseluruhan'];
+                const mandatoryFields = ['Nama Syarikat', 'No SSM (jika ada)', 'Alamat', 'No Telefon']; // Required for Step 0 validation
+                // const isComplete = window.isCompanyInfoComplete(); // Validation check removed
+
+                html += '<div class="space-y-6 bg-white p-6 rounded-xl shadow-lg">';
+                fields.forEach(field => {
+                    const id = field.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_'); 
+                    const value = currentAnswers[id] || '';
+                    const isNumber = field.includes('Jualan') || field.includes('Bilangan');
+                    const isMandatory = mandatoryFields.includes(field);
+                    
+                    const label = isMandatory ? `${field} <span class="text-red-500">*</span>` : field;
+                    
+                    html += `
+                        <div>
+                            <label for="${id}" class="block text-sm font-medium text-gray-700 mb-1">${label}</label>
+                            <input type="${isNumber ? 'number' : 'text'}" id="${id}" value="${value}" 
+                                onchange="window.handleAnswer('${id}', this.value)"
+                                oninput="window.handleAnswer('${id}', this.value)"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                                placeholder="${field}">
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                
+                // Form Completion Warning removed
+
+            } else if (step.type === 'qa') {
+                // --- QA Sections ---
+                const questions = qaQuestions[step.id];
+                html += '<div class="space-y-6">';
+                questions.forEach((question, index) => {
+                    const id = `${step.id}_${index}`;
+                    const answer = currentAnswers[id] || '';
+                    
+                    let questionNote = '';
+                    // Display point value next to the question (for transparency)
+                    const pointValue = questionPoints[step.id] ? questionPoints[step.id][index] : 0;
+                    if (pointValue > 0) {
+                        questionNote = `<span class="text-xs text-teal-600 font-semibold ml-2">(${pointValue} Mata)</span>`;
+                    }
+
+                    // --- MODIFIED BUTTON LIST: Removed 'TIDAK PASTI' ---
+                    html += `
+                        <div class="bg-white p-5 rounded-xl shadow-lg border-t-4 border-teal-500/50">
+                            <p class="font-medium text-gray-800 mb-3">${index + 1}. ${question} ${questionNote}</p>
+                            <div class="flex flex-wrap gap-3">
+                                ${['YA', 'TIDAK'].map(option => `
+                                    <button onclick="window.handleAnswer('${id}', '${option}')"
+                                        class="px-5 py-2 rounded-full text-sm font-semibold transition duration-150
+                                        ${answer === option ? 'bg-teal-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-teal-100'}">
+                                        ${option}
+                                    </button>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                    // --- END MODIFIED BUTTON LIST ---
+                });
+                html += '</div>';
+            } else if (step.type === 'textarea') { // NEW: Handle Ulasan tab
+                const question = "Apakah cabaran utama yang tuan/puan hadapi dalam memenuhi keperluan halal?";
+                const id = 'ulasan_cabaran_utama';
+                const value = currentAnswers[id] || '';
+
+                html += `
+                    <div class="bg-white p-6 rounded-xl shadow-lg">
+                        <div>
+                            <label for="${id}" class="block text-base font-medium text-gray-800 mb-3">${question}</label>
+                            <textarea id="${id}"
+                                onchange="window.handleAnswer('${id}', this.value)"
+                                oninput="window.handleAnswer('${id}', this.value)"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                                rows="10"
+                                placeholder="Sila nyatakan cabaran anda di sini (lebih kurang 300 patah perkataan)...">${value}</textarea>
+                        </div>
+                    </div>
+                `;
+            } else if (step.type === 'result') {
+                const score = window.calculateScore();
+                const isPaid = window.appState.isPaidClient;
+
+                // Only show the summary (score, status, AI) on the main screen
+                let summaryHtml = window.renderReportSummary(score);
+                
+                html += summaryHtml;
+
+                // Action Buttons with Payment Gate Logic
+                html += `
+                    <div class="mt-8 flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+                        
+                        <!-- Preview Button (Opens Modal with FULL Report) -->
+                        <button onclick="window.toggleModal(true)" 
+                                class="btn-secondary px-6 py-3 rounded-xl font-semibold border border-gray-300 hover:bg-gray-200">
+                            <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                            Preview Laporan Penuh
+                        </button>
+                        
+                        <!-- Download Button (Gated) -->
+                        <button onclick="window.handlePaymentGate()" 
+                                class="inline-flex items-center px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl
+                                ${isPaid ? 'btn-primary text-white' : 'bg-gray-300 text-gray-700 hover:bg-gray-400'}">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            Muat Turun Laporan (PDF) ${isPaid ? '' : ' (Bayaran Diperlukan)'}
+                        </button>
+                    </div>
+                    
+                    <!-- NEW: Disclaimer -->
+                    <div class="mt-8 pt-4 border-t border-gray-200">
+                        <p class="text-xs text-gray-500 italic font-semibold">Notis Penafian:</p>
+                        <p class="text-xs text-gray-500 mt-1">Laporan ini disediakan berdasarkan penilaian kendiri oleh usahawan. Segala maklumat yang terkandung hanyalah untuk tujuan rujukan dan penambahbaikan dalaman sahaja. Ia tidak boleh dianggap sebagai bukti rasmi atau dijadikan asas bagi sebarang tindakan undang-undang, tuntutan, atau prosiding lain.</p>
+                    </div>
+                `;
+
+                // Render Chart and call Gemini AI after content is injected into the DOM
+                setTimeout(() => {
+                    if (score.totalAnswered > 0) {
+                        // Render Chart into the main screen's pie chart canvas with the correct ID
+                        window.renderPieChart(score.answerBreakdown, 'mainReportPieChart');
+                        
+                        // Trigger AI Summary Generation
+                        window.getGeminiSummary(score).then(summary => {
+                            window.updateAiSummaryDisplay(summary);
+                        }).catch(err => {
+                            window.updateAiSummaryDisplay('Ralat: Gagal mendapatkan ringkasan AI.');
+                            console.error("Gemini AI fetch error:", err);
+                        });
+                    }
+                }, 100);
+            }
+
+            return html;
+        };
+
+        // NEW: Function to render ONLY the summary section (used for the main report screen view)
+        window.renderReportSummary = (score) => {
+            const progress = score.readinessScore;
+            
+            let status = '';
+            let statusColor = '';
+            let recommendation = '';
+
+            // Update score boundaries based on new requirements
+            if (progress >= 80) {
+                status = 'Bersedia';
+                statusColor = 'bg-green-100 text-green-700 border-green-500';
+                recommendation = 'Tahniah! Syarikat anda menunjukkan kesediaan yang sangat tinggi. Anda digalakkan untuk terus memohon pensijilan Halal JAKIM.';
+            } else if (progress >= 60) {
+                status = 'Kurang Bersedia';
+                statusColor = 'bg-yellow-100 text-yellow-700 border-yellow-500';
+                recommendation = 'Syarikat anda di tahap sederhana. Fokus kepada soalan yang dijawab "TIDAK" untuk meningkatkan kesediaan anda sebelum memohon.';
+            } else {
+                status = 'Tidak Bersedia';
+                statusColor = 'bg-red-100 text-red-700 border-red-500';
+                recommendation = 'Syarikat anda memerlukan penambahbaikan yang signifikan. Sila semak semua bahagian dan pastikan anda mencapai skor melebihi 80% sebelum pertimbangan permohonan.';
+            }
+
+            return `
+                <div class="space-y-8">
+                    <!-- Ringkasan Keputusan -->
+                    <div class="p-6 rounded-xl shadow-lg border border-gray-100">
+                        <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Ringkasan Keputusan</h3>
+                        <div class="flex flex-col sm:flex-row items-center justify-around text-center space-y-4 sm:space-y-0">
+                            <div>
+                                <p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p>
+                                <p class="text-xl text-gray-500 mt-1">Peratus Kesediaan</p>
+                            </div>
+                            <div>
+                                <p class="text-5xl font-extrabold text-gray-800">${score.totalPointsScored} / ${score.totalQuestions}</p>
+                                <p class="text-xl text-gray-500 mt-1">Mata Halal Diperolehi (Max ${score.totalQuestions} Mata)</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Status dan Rekomendasi -->
+                    <div class="text-center p-6 rounded-xl border-4 ${statusColor} shadow-md">
+                        <p class="text-2xl font-bold">Status Kesediaan: <span class="text-3xl">${status.toUpperCase()}</span></p>
+                        <p class="mt-4 text-md text-gray-700">${recommendation}</p>
+                    </div>
+
+                    <!-- Ringkasan Analisis AI Gemini -->
+                    <div class="p-6 bg-teal-50 rounded-xl shadow-lg border-l-4 border-teal-600">
+                        <h4 class="text-xl font-semibold text-gray-800 mb-3 flex items-center">
+                            <svg class="w-6 h-6 mr-2 text-teal-600" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm-2.6-7.8c-.8.8-1.4 1.4-1.4 2.8h-1.6c0-1.7.7-2.7 1.6-3.6.8-.8 1.4-1.4 1.4-2.8 0-1.3-.7-2.3-1.6-3.2h1.6c.8.9 1.6 1.7 1.6 3.2 0 1.4-.7 2.4-1.6 3.3z"/></svg>
+                            Ringkasan Analisis AI Gemini
+                        </h4>
+                        <div id="ai-summary-content" class="text-gray-700 text-base italic">
+                            <p class="animate-pulse text-teal-600">
+                                <svg class="w-5 h-5 inline mr-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.836 2.583a2 2 0 000-5.166m-.726 5.145c-2.302-2.302-5.972-2.302-8.274 0"></path></svg>
+                                AI sedang menganalisis data anda. Sila tunggu sebentar...
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Carta Pai Analisis Jawapan Keseluruhan (Display on main screen) -->
+                    <div class="p-6 bg-white rounded-xl shadow-lg">
+                        <h4 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-2">Analisis Jawapan Keseluruhan</h4>
+                        <div class="flex justify-center w-full max-w-lg mx-auto">
+                            <canvas id="mainReportPieChart" width="400" height="400"></canvas>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // NEW: Function to render the FULL DETAILED report (used for PDF and Modal Preview)
+        window.renderReportContent = () => {
+            const score = window.calculateScore();
+            const progress = score.readinessScore;
+            const currentAnswers = window.appState.answers;
+            const scoredSections = ['syarat', 'premis', 'bahan', 'sanitasi', 'pekerja', 'dokumentasi'];
+
+            let status = '';
+            let statusColor = '';
+            let recommendation = '';
+
+            // Update score boundaries based on new requirements
+            if (progress >= 80) {
+                status = 'Bersedia';
+                statusColor = 'bg-green-100 text-green-700 border-green-500';
+                recommendation = 'Tahniah! Syarikat anda menunjukkan kesediaan yang sangat tinggi. Anda digalakkan untuk terus memohon pensijilan Halal JAKIM.';
+            } else if (progress >= 60) {
+                status = 'Kurang Bersedia';
+                statusColor = 'bg-yellow-100 text-yellow-700 border-yellow-500';
+                recommendation = 'Syarikat anda di tahap sederhana. Fokus kepada soalan yang dijawab "TIDAK" untuk meningkatkan kesediaan anda sebelum memohon.';
+            } else {
+                status = 'Tidak Bersedia';
+                statusColor = 'bg-red-100 text-red-700 border-red-500';
+                recommendation = 'Syarikat anda memerlukan penambahbaikan yang signifikan. Sila semak semua bahagian dan pastikan anda mencapai skor melebihi 80% sebelum pertimbangan permohonan.';
+            }
+
+            // Report Header
+            let reportHtml = `
+                <div id="pdf-content-container" class="p-8 space-y-8 bg-white print:shadow-none print:border-none print:p-0">
+                    <div class="text-center pb-4 border-b border-gray-200">
+                        <h1 class="text-3xl font-extrabold text-gray-800">Laporan Semakan Jurang Halal (eHalalGAP)</h1>
+                        <p class="text-lg text-gray-500 mt-1">Analisis Kendiri untuk Pensijilan Halal</p>
+                        <p class="text-sm text-gray-500">Tarikh Laporan: ${new Date().toLocaleDateString('ms-MY')}</p>
+                        <p class="text-sm text-gray-500">ID Klien: ${window.appState.userId}</p>
+                    </div>
+
+                    <!-- Ringkasan Keputusan -->
+                    <div class="p-6 rounded-xl shadow-lg border border-gray-100">
+                        <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Ringkasan Keputusan</h3>
+                        <div class="flex flex-col sm:flex-row items-center justify-around text-center space-y-4 sm:space-y-0">
+                            <div>
+                                <p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p>
+                                <p class="text-xl text-gray-500 mt-1">Peratus Kesediaan</p>
+                            </div>
+                            <div>
+                                <p class="text-5xl font-extrabold text-gray-800">${score.totalPointsScored} / ${score.totalQuestions}</p>
+                                <p class="text-xl text-gray-500 mt-1">Mata Halal Diperolehi (Max ${score.totalQuestions} Mata)</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Status dan Rekomendasi -->
+                    <div class="text-center p-6 rounded-xl border-4 ${statusColor} shadow-md">
+                        <p class="text-2xl font-bold">Status Kesediaan: <span class="text-3xl">${status.toUpperCase()}</span></p>
+                        <p class="mt-4 text-md text-gray-700">${recommendation}</p>
+                    </div>
+
+                    <!-- Ringkasan Analisis AI Gemini (Only if generated) -->
+                    <div class="p-6 bg-teal-50 rounded-xl shadow-lg border-l-4 border-teal-600">
+                        <h4 class="text-xl font-semibold text-gray-800 mb-3 flex items-center">
+                            <svg class="w-6 h-6 mr-2 text-teal-600" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm-2.6-7.8c-.8.8-1.4 1.4-1.4 2.8h-1.6c0-1.7.7-2.7 1.6-3.6.8-.8 1.4-1.4 1.4-2.8 0-1.3-.7-2.3-1.6-3.2h1.6c.8.9 1.6 1.7 1.6 3.2 0 1.4-.7 2.4-1.6 3.3z"/></svg>
+                            Ringkasan Analisis AI Gemini
+                        </h4>
+                        <!-- Fetch this content from the main display if available, otherwise show placeholder -->
+                        <div class="text-gray-700 text-base italic">
+                            ${document.getElementById('ai-summary-content')?.innerHTML || '<p>Ringkasan AI belum dijana (perlu kembali ke skrin utama laporan).</p>'}
+                        </div>
+                    </div>
+                    
+                    <!-- Maklumat Syarikat (for context in report) -->
+                    <div class="p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-200">
+                        <h4 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Maklumat Syarikat</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+                            ${['Nama Syarikat', 'No SSM (jika ada)', 'Alamat', 'No Telefon', 'Nama Pemilik', 'Jualan tahunan syarikat', 'Bilangan pekerja keseluruhan'].map(field => {
+                                const id = field.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_'); 
+                                const value = currentAnswers[id] || '- Belum diisi -';
+                                return `<p><strong>${field}:</strong> ${value}</p>`;
+                            }).join('')}
+                        </div>
+                    </div>
+
+                    <!-- NEW: Client's Review -->
+                    ${(() => {
+                        const clientReview = currentAnswers['ulasan_cabaran_utama'];
+                        if (clientReview && clientReview.trim() !== '') {
+                            return `
+                                <div class="p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-200">
+                                    <h4 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Ulasan Cabaran Utama oleh Klien</h4>
+                                    <p class="text-sm text-gray-700 whitespace-pre-wrap">${clientReview}</p>
+                                </div>
+                            `;
+                        }
+                        return '';
+                    })()}
+
+                    <!-- Carta Pai Analisis Jawapan Keseluruhan (Canvas must be rendered in modal) -->
+                    <div class="p-6 bg-white rounded-xl shadow-lg">
+                        <h4 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-2">Analisis Jawapan Keseluruhan</h4>
+                        <div class="flex justify-center w-full max-w-lg mx-auto">
+                            <!-- Use a unique ID for the modal chart -->
+                            <canvas id="modalReportPieChart" width="400" height="400"></canvas> 
+                        </div>
+                    </div>
+                    
+                    <!-- NEW: Laporan Jurang Pematuhan Kritikal (Jawapan TIDAK) -->
+                    <div class="p-6 bg-white rounded-xl shadow-lg border-t-4 border-red-500">
+                        <h4 class="text-xl font-bold text-red-700 mb-4 border-b pb-2">
+                             <svg class="w-6 h-6 inline mr-2 -mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.332 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                             Jurang Pematuhan Kritikal
+                        </h4>
+                        ${window.renderGapsTable(currentAnswers, scoredSections)}
+                    </div>
+
+
+                    <!-- Analisis GAP Mengikut Bahagian (Full Details) -->
+                    <div class="p-6 bg-white rounded-xl shadow-lg">
+                        <h4 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-2">Analisis GAP Mengikut Bahagian</h4>
+                        ${scoredSections.map(sectionId => {
+                            const questions = (sectionId === 'syarat') 
+                                ? flowSteps.find(s => s.id === 'syarat').questions 
+                                : qaQuestions[sectionId];
+                                
+                            const points = questionPoints[sectionId] || [];
+                            let secMaxPoints = 0;
+                            let secPointsScored = 0;
+                            let secNeedsImprovement = 0;
+
+                            points.forEach(p => { secMaxPoints += p; });
+
+                            questions.forEach((q, index) => {
+                                const answer = currentAnswers[`${sectionId}_${index}`];
+                                if (answer) {
+                                    let isReadyAnswer = (answer === 'YA');
+                                    if (sectionId === 'bahan' && (index === 3 || index === 4)) { isReadyAnswer = (answer === 'TIDAK'); } // Inverted logic
+
+                                    if (isReadyAnswer) { 
+                                        secPointsScored += points[index];
+                                    } else {
+                                        secNeedsImprovement++;
+                                    }
+                                }
+                            });
+                            
+                            const secPercentage = secMaxPoints > 0 ? (secPointsScored / secMaxPoints) * 100 : 0;
+                            const stepObject = flowSteps.find(s => s.id === sectionId);
+                            const secTitle = stepObject ? stepObject.title.replace(/^\d+\.\s*/, '') : 'Bahagian Tidak Diketahui'; 
+                            
+                            const barColor = secPercentage >= 80 ? 'bg-green-500' : secPercentage >= 60 ? 'bg-yellow-500' : 'bg-red-500';
+                            
+                            return `
+                                <div class="mb-6 border-b pb-4">
+                                    <h5 class="text-lg font-bold text-gray-800 mb-2">${secTitle}</h5>
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="text-sm font-medium text-gray-700">Mata Diperolehi: ${secPointsScored}/${secMaxPoints}</span>
+                                        <span class="text-lg font-bold ${secNeedsImprovement > 0 ? 'text-red-600' : 'text-green-600'}">${secPercentage.toFixed(0)}%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 rounded-full h-3">
+                                        <div class="${barColor} h-3 rounded-full" style="width: ${secPercentage.toFixed(0)}%"></div>
+                                    </div>
+                                    ${secNeedsImprovement > 0 ? `<p class="text-sm text-red-500 mt-2">Terdapat ${secNeedsImprovement} isu yang memerlukan penambahbaikan segera.</p>` : `<p class="text-sm text-green-500 mt-2">Cemerlang! Bahagian ini memenuhi kriteria.</p>`}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+
+                    <!-- NEW: Disclaimer -->
+                    <div class="pt-8 text-sm text-gray-600 text-center border-t border-gray-200">
+                        <p class="text-xs text-gray-700 italic font-bold">Notis Penafian:</p>
+                        <p class="text-xs text-gray-600 mt-1">Laporan ini disediakan berdasarkan penilaian kendiri oleh usahawan. Segala maklumat yang terkandung hanyalah untuk tujuan rujukan dan penambahbaikan dalaman sahaja. Ia tidak boleh dianggap sebagai bukti rasmi atau dijadikan asas bagi sebarang tindakan undang-undang, tuntutan, atau prosiding lain.</p>
+                    </div>
+                    
+                    <!-- Ruang Tandatangan (Footer dalam PDF) -->
+                    <div class="pt-4 text-sm text-gray-600 text-center">
+                        <p>&copy; Hak Cipta Ace UniKL MICET 2025. Tertakluk kepada pengesahan audit rasmi oleh pihak berkuasa Halal.</p>
+                    </div>
+
+                </div>
+            `;
+            return reportHtml;
+        }
+
+        window.handleAnswer = (key, value) => {
+            // FIX: Ensure value is trimmed for all form inputs to prevent whitespace issues
+            let sanitizedValue = (typeof value === 'string' || value === null || value === undefined) ? String(value).trim() : value;
+            
+            let newAnswers = { ...window.appState.answers, [key]: sanitizedValue };
+
+            // Special handling for selection/radio buttons to clear others
+            const currentStep = flowSteps[window.appState.currentStep];
+            if (currentStep.type === 'selection' && currentStep.options) {
+                const isSelection = currentStep.type === 'selection';
+                
+                if (isSelection && value === 'YA') {
+                    currentStep.options.forEach((_, index) => {
+                        const id = `${currentStep.id}_${index}`;
+                        if (id !== key) {
+                            // Ensure only 'YA' answers for other options are cleared, not form data etc.
+                            if (newAnswers[id] === 'YA') {
+                                delete newAnswers[id];
+                            }
+                        }
+                    });
+                }
+            }
+
+            window.updateState({ answers: newAnswers });
+        };
+
+        window.changeStep = (direction) => {
+            const newStep = window.appState.currentStep + direction;
+            if (newStep >= 0 && newStep < flowSteps.length) {
+                // Update state first
+                window.updateState({ currentStep: newStep });
+
+                // NEW LOGIC: Auto-scroll
+                setTimeout(() => {
+                    // 1. Vertical Scroll: Scroll to the top of the main content area
+                    const targetElement = document.getElementById('main-content-start');
+                    if (targetElement) {
+                        targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    } else {
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                    
+                    // 2. Horizontal Scroll: Adjust the tab menu position
+                    const activeTabIndex = newStep;
+                    const tabContainer = document.getElementById('tab-nav-container');
+                    const activeTabButton = tabContainer?.children[activeTabIndex];
+                    
+                    if (activeTabButton && tabContainer) {
+                        activeTabButton.scrollIntoView({
+                            behavior: 'smooth',
+                            inline: 'center' // Scroll horizontally to center the active tab
+                        });
+                    }
+                    
+                }, 50); // Small delay ensures content has rendered
+            }
+        };
+
+        window.renderApp = () => {
+            const appContainer = document.getElementById('app-container');
+
+            if (!window.appState.authReady || !window.appState.isAuthenticated) {
+                appContainer.innerHTML = window.renderLogin();
+                return;
+            }
+
+            const currentStepIndex = window.appState.currentStep;
+            const score = window.calculateScore(); 
+
+            // Logic to disable the 'Seterusnya' button
+            let disableNext = currentStepIndex === flowSteps.length - 1;
+            
+            // Validation rules based on NEW step order (ALL VALIDATION REMOVED FOR BETA)
+            
+            /*
+            if (currentStepIndex === 0) { // Maklumat Syarikat (New Index 0)
+                 if (!window.isCompanyInfoComplete()) {
+                    disableNext = true;
+                }
+            } else if (currentStepIndex === 1) { // Syarat Kelayakan (New Index 1)
+                if (!window.isEligibilityMet()) {
+                    disableNext = true;
+                }
+            } else if (currentStepIndex === 2) { // Kategori Industri (New Index 2)
+                if (!window.isSelectionMade('kategori')) {
+                    disableNext = true;
+                }
+            } else if (currentStepIndex === 3) { // Skim Pensijilan (New Index 3)
+                 if (!window.isSelectionMade('skim')) {
+                    disableNext = true;
+                }
+            }
+            */
+
+            // The Introduction Text
+            const introductionHtml = `
+                <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+                    <div class="mb-8 p-6 bg-white rounded-xl shadow-lg border-l-4 border-teal-500">
+                        <h3 class="text-xl font-semibold mb-2 text-gray-800">Mengapa eHalalGAP?</h3>
+                        <p class="text-base text-gray-600 leading-relaxed">
+                            Proses pensijilan Halal boleh menjadi rumit. e-HalalGAP memudahkannya dengan membantu anda menjejaki kesiapsiagaan, menggambarkan kemajuan, dan mengurus semua dokumentasi anda di satu tempat. Perunding anda juga boleh melihat kemajuan anda, menjadikan kerjasama lebih mudah berbanding sebelum ini.
+                        </p>
+                    </div>
+                </div>
+            `;
+
+            // Main dashboard content
+            appContainer.innerHTML = `
+                <div class="min-h-screen bg-gray-50 flex flex-col">
+                    <!-- Header/Hero Section -->
+                    <header class="hero-bg py-4 px-4 shadow-lg">
+                        <div class="max-w-6xl mx-auto text-white flex justify-between items-center">
+                            
+                            <!-- Title/Branding -->
+                            <div>
+                                <h1 class="text-xl font-extrabold tracking-tight sm:text-2xl">
+                                    Semakan Jurang Halal (eHalalGAP)
+                                </h1>
+                                <p class="mt-1 text-sm text-gray-200">
+                                    Analisis Kendiri untuk Pensijilan Halal
+                                </p>
+                            </div>
+                            
+                            <!-- NEW: Logout Button -->
+                            <button onclick="window.logoutClient()"
+                                class="bg-red-500 text-white hover:bg-red-600 px-4 py-2 rounded-lg text-sm font-semibold transition duration-150 shadow-md flex items-center">
+                                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                                Log Keluar
+                            </button>
+                        </div>
+                    </header>
+
+                    <!-- Main Content Area -->
+                    <main class="flex-grow max-w-6xl mx-auto py-8 w-full">
+                        
+                        <!-- New Introduction Text (Moved here, outside header) -->
+                        ${introductionHtml}
+
+                        <!-- Adjust main padding for consistency -->
+                        <div class="px-4 sm:px-6 lg:px-8" id="main-content-start">
+                            <!-- Progress and Navigation Tabs -->
+                            ${window.renderProgress(score)}
+
+                            <!-- Flow Navigation Tabs -->
+                            <nav class="flex overflow-x-auto whitespace-nowrap space-x-2 sm:space-x-4 mb-8 p-1 bg-white rounded-xl shadow-md" id="tab-nav-container">
+                                ${flowSteps.map((step, index) => {
+                                    // Strip "N. " prefix from the tab title for cleaner navigation (Addressing user request)
+                                    const tabTitle = step.title.replace(/^\d+\.\s*/, '');
+                                    
+                                    // Modified button structure: Removed onclick handler and enforced cursor-default
+                                    return `
+                                        <button 
+                                            class="py-3 px-3 sm:px-4 text-sm font-medium transition duration-150 rounded-lg cursor-default 
+                                            ${index === currentStepIndex ? 'tab-active bg-teal-50' : 'text-gray-600'}">
+                                            ${tabTitle}
+                                        </button>
+                                    `;
+                                }).join('')}
+                            </nav>
+
+                            <!-- Content Area -->
+                            <div class="p-6 bg-white rounded-xl shadow-2xl border-t-4 border-teal-500">
+                                ${window.renderTabContent()}
+                            </div>
+
+                            <!-- Navigation Buttons - UPDATED FOR SAVE BUTTON -->
+                            <div class="mt-8 flex justify-between items-center">
+                                <!-- Button Sebelumnya -->
+                                <button onclick="window.changeStep(-1)" ${currentStepIndex === 0 ? 'disabled' : ''}
+                                    class="btn-secondary px-6 py-3 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                                    &larr; Sebelumnya
+                                </button>
+
+                                <!-- Save Progress Button & Status (Center) -->
+                                <div class="flex flex-col items-center space-y-2">
+                                    <button onclick="window.manualSave()" ${currentStepIndex === flowSteps.length - 1 ? 'disabled' : ''}
+                                            id="save-progress-btn" 
+                                            class="inline-flex items-center btn-secondary px-6 py-3 rounded-xl font-semibold hover:bg-teal-100 text-teal-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                                        Simpan Kemajuan
+                                    </button>
+                                    <p id="save-status-message" class="text-xs text-gray-500 opacity-0 transition duration-300"></p>
+                                </div>
+                                
+                                <!-- Button Seterusnya -->
+                                <button onclick="window.changeStep(1)" ${disableNext ? 'disabled' : ''}
+                                    class="btn-primary px-6 py-3 rounded-xl text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
+                                    Seterusnya &rarr;
+                                </button>
+                            </div>
+                        </div>
+                    </main>
+                    
+                    <!-- Footer Section -->
+                    <footer class="bg-gray-800 text-white p-4 mt-8">
+                        <div class="max-w-6xl mx-auto text-center text-sm">
+                            <p>&copy; Hak Cipta Ace UniKL MICET 2025. Semua Hak Cipta Terpelihara.</p>
+                        </div>
+                    </footer>
+                </div>
+
+                <!-- NEW: Report Preview Modal -->
+                <div id="report-modal" class="modal">
+                    <div class="modal-content">
+                        <!-- Modal Header -->
+                        <div class="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-xl z-10 shadow-sm">
+                            <h2 class="text-2xl font-bold text-gray-800">Preview Laporan Penuh</h2>
+                            <button onclick="window.toggleModal(false)" class="text-gray-500 hover:text-gray-800 transition duration-150">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                        </div>
+                        <!-- Modal Body: This will contain the full renderReportContent output -->
+                        <div id="modal-report-body">
+                            <!-- Report content will be dynamically loaded here by toggleModal(true) -->
+                        </div>
+                        <!-- Modal Footer -->
+                         <div class="sticky bottom-0 bg-gray-50 border-t p-4 flex justify-center rounded-b-xl z-10 space-x-4">
+                            <button onclick="window.toggleModal(false)" class="btn-secondary px-6 py-3 rounded-xl font-semibold">Tutup Preview</button>
+                             <button onclick="window.handlePaymentGate()" class="btn-primary px-6 py-3 rounded-xl text-white font-semibold">
+                                Muat Turun (Bayaran)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+    </script>
+</head>
+<body>
+    <div id="app-container">
+        <!-- Content will be rendered here by JavaScript -->
+        <div class="h-screen flex items-center justify-center">
+            <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-teal-500"></div>
+            <p class="ml-4 text-teal-600">Memuatkan Aplikasi...</p>
+        </div>
+    </div>
+</body>
+</html>
+
