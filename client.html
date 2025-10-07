@@ -132,33 +132,31 @@
             currentStep: 0,
             answers: {},
             isPaidClient: false, 
-            isRegisterMode: false
+            isRegisterMode: false,
+            assessmentCompleted: false // NEW: Flag to track if assessment is finalized
         };
-
-        let pieChartInstance = null;
-        let modalPieChartInstance = null;
-
+        
         // UPDATED a new flowSteps
         const flowSteps = [
-            { id: 'maklumat', title: '1. Maklumat Syarikat', type: 'form', description: 'Sila isikan maklumat asas syarikat anda.'},
-            { id: 'kategori', title: '2. Kategori Industri', type: 'selection', description: 'Sila pilih **salah satu** kategori industri syarikat anda.', options: ['Mikro (Jualan Tahunan < RM300,000 ATAU Pekerja < 5 orang)', 'Kecil (Jualan Tahunan RM300,000 - RM 15 juta ATAU Pekerja 5 - 75 orang)', 'Sederhana (Jualan Tahunan RM 15 juta - RM 50 juta ATAU Pekerja 75 - 200 orang)', 'Besar (Jualan Tahunan > RM 50 juta ATAU Pekerja > 200 orang)']},
+            { id: 'maklumat', title: '1. Maklumat Perniagaan', type: 'form', description: 'Sila isikan maklumat asas perniagaan anda.'},
+            { id: 'kategori', title: '2. Kategori Industri', type: 'selection', description: 'Sila pilih **salah satu** kategori industri perniagaan anda.', options: ['Mikro (Jualan Tahunan < RM300,000 ATAU Pekerja < 5 orang)', 'Kecil (Jualan Tahunan RM300,000 - RM 15 juta ATAU Pekerja 5 - 75 orang)', 'Sederhana (Jualan Tahunan RM 15 juta - RM 50 juta ATAU Pekerja 75 - 200 orang)', 'Besar (Jualan Tahunan > RM 50 juta ATAU Pekerja > 200 orang)']},
             { id: 'skim', title: '3. Skim Pensijilan', type: 'selection', description: 'Sila pilih **salah satu** skim pensijilan Halal yang berkaitan dengan jenis perniagaan anda.', options: ['Produk Makanan dan Minuman', 'Produk Kosmetik', 'Produk Farmaseutikal', 'Premis Makanan', 'Produk Barang Gunaan', 'Perkhidmatan Logistik', 'Rumah Sembelihan', 'Pengilangan Kontrak/OEM', 'Produk Peranti Perubatan']},
-            { id: 'syarat', title: '4. Umum', type: 'checklist', description: 'Sila semak sama ada syarikat anda memenuhi syarat-syarat asas ini.', questions: ["Adakah syarikat berdaftar dengan Suruhanjaya Syarikat Malaysia (SSM)?", "Adakah syarikat Telah beroperasi sepenuhnya sekurang-kurangnya 3 bulan?", "Adakah syarikat Memiliki lesen atau kelulusan daripada PBT?", "Jika premis makanan, adakah telah mendapat perakuan FOSIM? *", "Jika skim kosmetik, adakah telah mendapat perakuan NPRA? *"]},
+            { id: 'syarat', title: '4. Umum', type: 'checklist', description: 'Sila semak sama ada perniagaan anda memenuhi syarat-syarat asas ini.', questions: ["Adakah perniagaan berdaftar dengan Suruhanjaya Perniagaan Malaysia (SSM)?", "Adakah perniagaan Telah beroperasi sepenuhnya sekurang-kurangnya 3 bulan?", "Adakah perniagaan Memiliki lesen atau kelulusan daripada PBT?", "Jika premis makanan, adakah telah mendapat perakuan FOSIM? *", "Jika skim kosmetik, adakah telah mendapat perakuan NPRA? *"]},
             { id: 'premis', title: '5. Premis', type: 'qa', description: 'Soalan berkaitan lokasi, struktur, dan pelan lantai premis.'},
             { id: 'bahan', title: '6. Bahan Mentah & Peralatan', type: 'qa', description: 'Soalan berkaitan bahan mentah, penyimpanan, dan peralatan.'},
             { id: 'sanitasi', title: '7. Sanitasi', type: 'qa', description: 'Soalan berkaitan kebersihan dan kawalan makhluk perosak.'},
             { id: 'pekerja', title: '8. Pekerja', type: 'qa', description: 'Soalan berkaitan pekerja dan latihan halal.'},
-            { id: 'dokumentasi', title: '9. Dokumentasi & Rekod', type: 'qa', description: 'Soalan berkaitan sistem dokumentasi dan rekod syarikat.'},
+            { id: 'dokumentasi', title: '9. Dokumentasi & Rekod', type: 'qa', description: 'Soalan berkaitan sistem dokumentasi dan rekod perniagaan.'},
             { id: 'ulasan', title: '10. Ulasan', type: 'textarea', description: 'Sila kongsikan pandangan dan cabaran utama anda.' },
-            { id: 'result', title: '11. Keputusan & Laporan', type: 'result', description: 'Laporan Kesediaan Halal JAKIM anda.' }
+            { id: 'result', title: '11. Keputusan & Laporan', type: 'result', description: 'Laporan Ketersediaan Halal JAKIM anda.' }
         ];
 
         const qaQuestions = {
             premis: ["Adakah premis anda terletak jauh dari dan tidak dicemari oleh ladang babi atau aktiviti pemprosesan tidak halal?","Adakah premis bebas daripada bahan mentah dan produk tidak halal seperti arak dan daging babi?","Adakah premis mempunyai mekanisme pengawalan bagi mencegah haiwan peliharaan atau liar, serangga dan haiwan perosak daripada memasuki atau berada di dalam kawasan premis?","Adakah premis dalam keadaan baik, bersih dan kemas?","Adakah lantai, dinding, siling, kipas, penghawa dingin, tingkap dan pintu berkeadaan bersih dan tidak menyumbang kepada pencemaran?","Adakah bekalan air terawat dari Jabatan Bekalan Air (potable water) mencukupi dan dilindungi daripada pencemaran?","Adakah ruang simpanan bahan mentah dipisahkan daripada ruang simpanan produk siap?","Adakah terdapat kemudahan sinki untuk basuh tangan yang dilengkapi dengan sabun dan tuala pakai buang/pengering tangan?","Adakah lantai diperbuat daripada bahan kalis air, tidak menyerap dan mudah dibersihkan?","Adakah terdapat sistem saliran air yang baik pada lantai pemprosesan?","Adakah dinding premis licin, kalis air, dan mudah dicuci?","Adakah siling atau bahagian atas premis direka untuk elak habuk jatuh, kulapuk dan titisan air?","Adakah pintu premis diperbuat daripada bahan kalis air, mudah dibersihkan, dan ditutup secara kendiri?","Adakah tingkap yang boleh dibuka dilengkapi dengan jaring/mosquito net untuk elak serangga masuk?","Adakah pencahayaan di kawasan pemprosesan mencukupi dan tidak menyebabkan risiko pencemaran makanan?","Adakah lampu yang berpenutup digunakan di kawasan pemprosesan?","Adakah sistem pengudaraan premis berfungsi baik dan aliran udara bergerak dari kawasan bersih ke kawasan kurang bersih (bukan sebaliknya)?","Adakah bilik air/tandas disediakan dalam jumlah mencukupi?","Adakah bilik air/tandas tidak terus bersambung dengan ruang pemprosesan makanan?","Adakah premis mempunyai stor yang berasingan untuk Bahan mentah?","Adakah premis mempunyai stor yang berasingan untuk Produk siap?","Adakah premis mempunyai stor yang berasingan untuk Bahan kimia/pembersihan?","Adakah premis menyediakan ruang solat kepada pekerja muslim?","Adakah premis menyediakan ruang persalinan kepada pekerja?","Adakah premis menyediakan ruang makan atau rehat kepada pekerja?","Adakah premis menyediakan kemudahan penyimpanan barang peribadi kepada pekerja?","Adakah premis memastikan alat dan unsur penyembahan tidak berada dalam kawasan pemprosesan?","Adakah premis memastikan tempat tinggal pekerja tidak berada dalam kawasan pemprosesan?","Adakah aliran proses pengeluaran makanan dalam premis satu arah (linear flow)?","Adakah terdapat pemisahan kawasan bersih dan kawasan kotor untuk mengelakkan pencemaran?"],
             bahan: ["Adakah semua bahan mentah (termasuk bahan tambahan & bahan pembungkusan primer) mempunyai sijil halal yang sah?","Jika bahan mentah diimport, adakah ia daripada badan pensijilan halal luar negara yang diiktiraf JAKIM?","Adakah rekod pembelian bahan mentah (invois, delivery order) disimpan dan boleh diaudit?","Adakah terdapat sebarang bahan mentah daripada sumber syubhah/diragui?","Adakah bahan mentah halal disimpan berasingan daripada bahan tidak halal/diragui?","Adakah stor bahan mentah dilabel dengan jelas untuk elak kekeliruan (contoh: 'Halal Certified', 'Non-halal', 'Bahan Kimia')?"],
             sanitasi: ["Adakah terdapat sink untuk basuh tangan yang dilengkapi sabun, tisu/pengering automatik, dan air bersih?","Adakah terdapat jadual pembersihan dan sanitasi bertulis yang disediakan dan disemak?","Adakah tong sampah bertutup dan mudah dibersihkan digunakan dalam premis?","Adakah bilik air/tandas Bersih, tidak berbau dan tidak terbuka secara langsung kepada kawasan pemprosesan?","Adakah terdapat sistem kawalan makhluk perosak?"],
-            pekerja: ["Adakah syarikat mempunyai pekerja muslim warganegara?","Adakah pekerja syarikat telah menerima latihan halal?"],
-            dokumentasi: ["Adakah dokumen dan rekod disimpan dengan baik, dikemaskini dan mudah untuk dirujuk?","Adakah syarikat menyimpan rekod pembelian bahan mentah bersama sijil halal pembekal?"]
+            pekerja: ["Adakah perniagaan mempunyai pekerja muslim warganegara?","Adakah pekerja perniagaan telah menerima latihan halal?"],
+            dokumentasi: ["Adakah dokumen dan rekod disimpan dengan baik, dikemaskini dan mudah untuk dirujuk?","Adakah perniagaan menyimpan rekod pembelian bahan mentah bersama sijil halal pembekal?"]
         };
 
         const questionPoints = {
@@ -178,7 +176,7 @@
                 const docRef = getPublicSummaryDocRef(userId);
                 const summaryData = {
                     userId: userId,
-                    clientName: dataToSave.answers['nama_syarikat'] || 'Klien Baru',
+                    clientName: dataToSave.answers['nama_perniagaan'] || 'Klien Baru',
                     currentStepTitle: flowSteps[dataToSave.currentStep].title,
                     currentStepIndex: dataToSave.currentStep,
                     totalSteps: flowSteps.length,
@@ -203,6 +201,7 @@
                     const dataToSave = {
                         currentStep: window.appState.currentStep,
                         answers: window.appState.answers,
+                        assessmentCompleted: window.appState.assessmentCompleted
                     };
                     const score = window.calculateScore();
                     
@@ -323,7 +322,7 @@
                         onSnapshot(privateDocRef, (docSnap) => {
                             if (docSnap.exists()) {
                                 const data = docSnap.data();
-                                window.appState = { ...window.appState, currentStep: data.currentStep || 0, answers: data.answers || {} };
+                                window.appState = { ...window.appState, currentStep: data.currentStep || 0, answers: data.answers || {}, assessmentCompleted: data.assessmentCompleted || false };
                             }
                             window.renderApp();
                         }, (error) => {
@@ -358,9 +357,24 @@
                     if (answer) {
                         totalAnswered++;
                         let isReadyAnswer = (answer === 'YA');
-                        if (sectionId === 'bahan' && (index === 3 || index === 4)) { isReadyAnswer = (answer === 'TIDAK'); }
-                        if (isReadyAnswer) { totalPointsScored += points[index] || 0; countYa++; } 
-                        else if (answer === 'TIDAK') { countTidak++; }
+
+                        if (sectionId === 'bahan' && index === 3) { 
+                            isReadyAnswer = (answer === 'TIDAK'); 
+                        }
+                        
+                        if (sectionId === 'syarat' && (index === 3 || index === 4)) {
+                            isReadyAnswer = (answer === 'YA' || answer === 'Tidak Berkenaan');
+                        }
+
+                        if (isReadyAnswer) { 
+                            totalPointsScored += points[index] || 0; 
+                        } 
+                        
+                        if (answer === 'YA' || answer === 'Tidak Berkenaan') {
+                            countYa++; 
+                        } else if (answer === 'TIDAK') { 
+                            countTidak++; 
+                        }
                     }
                 });
             });
@@ -370,49 +384,56 @@
         };
         
         window.getGeminiSummary = async (score) => {
-            const totalMaxPoints = 308;
-            const pointsScored = score.totalPointsScored;
-            const progress = score.readinessScore;
             const answers = window.appState.answers;
-            const qaSections = ['syarat', 'premis', 'bahan', 'sanitasi', 'pekerja', 'dokumentasi'];
             let status = '';
-            if (progress >= 80) { status = 'Bersedia'; } 
-            else if (progress >= 60) { status = 'Kurang Bersedia'; } 
+            if (score.readinessScore >= 80) { status = 'Bersedia'; } 
+            else if (score.readinessScore >= 60) { status = 'Kurang Bersedia'; } 
             else { status = 'Tidak Bersedia'; }
-            let promptData = `Analisis Kesediaan Pensijilan Halal (eHalalGAP) Syarikat:\n\nSTATUS KESELURUHAN: ${status} (${progress.toFixed(0)}% Skor | ${pointsScored} dari ${totalMaxPoints} mata)\nAnalisis Bahagian:\n`;
-            qaSections.forEach(sectionId => {
-                const questions = (sectionId === 'syarat') ? flowSteps.find(s => s.id === 'syarat').questions : qaQuestions[sectionId];
-                const points = questionPoints[sectionId] || [];
-                let secMaxPoints = 0, secPointsScored = 0, secTidakCount = 0;
-                points.forEach(p => { secMaxPoints += p; });
-                questions.forEach((q, index) => {
-                    const answer = answers[`${sectionId}_${index}`];
-                    if (answer) {
-                        let isReadyAnswer = (answer === 'YA');
-                        if (sectionId === 'bahan' && (index === 3 || index === 4)) { isReadyAnswer = (answer === 'TIDAK'); }
-                        if (isReadyAnswer) { secPointsScored += points[index] || 0; } 
-                        else if (answer === 'TIDAK') { secTidakCount++; }
-                    }
-                });
-                const secPercentage = secMaxPoints > 0 ? (secPointsScored / secMaxPoints) * 100 : 0;
-                const secTitle = flowSteps.find(s => s.id === sectionId)?.title.replace(/^\d+\.\s*/, '') || sectionId;
-                promptData += `- ${secTitle}: Skor ${secPointsScored}/${secMaxPoints} (${secPercentage.toFixed(0)}%). GAP: ${secTidakCount}\n`;
-            });
-            const systemPrompt = `Anda adalah Juruanalisis Pematuhan Halal. Berdasarkan data berikut, hasilkan ringkasan profesional dalam Bahasa Melayu merangkumi: 1. Status & skor. 2. Kekuatan (>80%). 3. Kelemahan. 4. 1-2 nasihat kritikal. Format dalam satu perenggan padat, tanpa tajuk.`;
-            const userQuery = `Sila analisis data penilaian kesediaan Halal berikut:\n${promptData}`;
+
+            // Construct a simplified prompt
+            let userQuery = `
+                Analisis data penilaian kendiri Halal berikut:
+                - Status Keseluruhan: ${status}
+                - Skor Ketersediaan: ${score.readinessScore.toFixed(0)}%
+                - Jumlah Mata: ${score.totalPointsScored} / ${score.totalQuestions}
+                - Pecahan Jawapan: ${score.answerBreakdown.ya} YA, ${score.answerBreakdown.tidak} TIDAK
+            `;
+            
+            // Add client's challenges if available
+            if (answers.ulasan_cabaran_utama) {
+                userQuery += `\n- Cabaran Utama Klien: ${answers.ulasan_cabaran_utama}`;
+            }
+
+            const systemPrompt = `Anda adalah Juruanalisis Pematuhan Halal. Berdasarkan data berikut, hasilkan ringkasan profesional dalam Bahasa Melayu. Ringkasan perlu merangkumi: 1. Status keseluruhan & skor. 2. Bahagian terkuat (jika ada). 3. Bahagian paling lemah yang memerlukan perhatian segera berdasarkan jawapan "TIDAK". 4. 1-2 nasihat kritikal. Format dalam satu perenggan padat, tanpa tajuk atau senarai.`;
+            
             const apiKey = ""; 
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-            const payload = { contents: [{ parts: [{ text: userQuery }] }], systemInstruction: { parts: [{ text: systemPrompt }] } };
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+            
             try {
                 const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                if (!response.ok) {
+                    const errorBody = await response.json();
+                    console.error("Gemini API error response:", errorBody);
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 const result = await response.json();
-                return result.candidates?.[0]?.content?.parts?.[0]?.text || "Gagal menjana ringkasan AI.";
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                    return text;
+                } else {
+                    console.error("Invalid response structure from Gemini API:", result);
+                    return "Gagal menjana ringkasan: Tiada kandungan diterima daripada AI.";
+                }
             } catch (error) {
-                console.error("Gemini AI fetch error:", error);
-                return "Gagal mendapatkan ringkasan AI.";
+                console.error("Gemini API fetch error:", error);
+                return "Gagal mendapatkan ringkasan AI akibat ralat teknikal. Sila cuba lagi.";
             }
         };
+
 
         window.renderGapsTable = (answers, scoredSections) => {
             let allGaps = [];
@@ -427,20 +448,38 @@
                 questions.forEach((q, index) => {
                     const answer = answers[`${sectionId}_${index}`];
                     let isGap = false;
-                    if (sectionId === 'bahan' && (index === 3 || index === 4)) isGap = (answer === 'YA');
-                    else isGap = (answer === 'TIDAK' || answer === 'TIDAK PASTI');
-                    if (isGap) allGaps.push({ section: secTitle, question: q.replace(/\*/g, '').trim(), pointValue: points[index] || 0 });
+
+                    if (sectionId === 'bahan' && index === 3) { // Inverted GAP logic for 'bahan' question 4
+                        isGap = (answer === 'YA');
+                    } else if (sectionId === 'syarat' && (index === 3 || index === 4)) { // Optional 'syarat' questions
+                        isGap = (answer === 'TIDAK');
+                    } else { // Default GAP logic
+                        isGap = (answer === 'TIDAK');
+                    }
+
+                    if (isGap) {
+                        allGaps.push({ section: secTitle, question: q.replace(/\*/g, '').trim(), pointValue: points[index] || 0 });
+                    }
                 });
             });
             if (allGaps.length === 0) return '<p class="text-sm text-green-600 p-4 border rounded-lg bg-green-50">Tiada jurang kritikal dikesan.</p>';
             return `<div class="overflow-x-auto shadow-md rounded-lg"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bahagian</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Soalan Jurang (GAP)</th><th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Mata Hilang</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">${allGaps.map(gap => `<tr class="hover:bg-red-50/50"><td class="px-6 py-4 text-sm font-medium text-red-700">${gap.section}</td><td class="px-6 py-4 text-sm">${gap.question}</td><td class="px-6 py-4 text-center text-sm font-bold text-red-600">${gap.pointValue}</td></tr>`).join('')}</tbody></table></div>`;
         };
 
-        window.renderPieChart = (answerBreakdown, canvasId, chartInstance) => {
-            const ctx = document.getElementById(canvasId);
-            if (!ctx) return;
-            if (chartInstance) chartInstance.destroy();
-            return new Chart(ctx, {
+        window.renderPieChart = (answerBreakdown, canvasTarget) => {
+            let canvasEl = canvasTarget;
+            if (typeof canvasTarget === 'string') {
+                canvasEl = document.getElementById(canvasTarget);
+            }
+
+            if (!canvasEl) return;
+            
+            const existingChart = Chart.getChart(canvasEl);
+            if (existingChart) {
+                existingChart.destroy();
+            }
+            
+            return new Chart(canvasEl, {
                 type: 'pie', data: { labels: ['YA (Halal Ready)', 'TIDAK (Perlu Tindakan)', 'Belum Dijawab'], datasets: [{ data: [answerBreakdown.ya, answerBreakdown.tidak, answerBreakdown.notAnswered], backgroundColor: ['#0d9488', '#dc2626', '#e5e7eb'], hoverOffset: 4 }] },
                 options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 14 } } }, title: { display: true, text: 'Analisis Jawapan Keseluruhan', font: { size: 18, family: 'Inter', weight: 'bold' } } } }
             });
@@ -461,7 +500,9 @@
                         modalBody.innerHTML = window.renderReportContent();
                         setTimeout(() => {
                             const score = window.calculateScore();
-                            if (score.totalAnswered > 0) modalPieChartInstance = window.renderPieChart(score.answerBreakdown, 'modalReportPieChart', modalPieChartInstance);
+                            if (score.totalAnswered > 0) {
+                                window.renderPieChart(score.answerBreakdown, 'modalReportPieChart');
+                            }
                         }, 100);
                     }
                 }
@@ -469,27 +510,34 @@
         };
 
         window.handlePaymentGate = () => {
-            if (window.appState.isPaidClient) {
-                window.downloadPDF();
-            } else {
-                const confirmed = confirm("Untuk memuat turun Laporan PDF, bayaran diperlukan. Teruskan (Simulasi Bayaran)?");
-                if (confirmed) {
-                    window.updateState({ isPaidClient: true });
-                    alert("Pembayaran Berjaya! Fungsi muat turun PDF kini diaktifkan.");
-                }
-            }
+            // Direct download for beta testing
+            window.downloadPDF();
         };
 
         window.downloadPDF = () => {
-            if (!window.appState.isPaidClient) {
-                alert("Sila lengkapkan bayaran untuk mengaktifkan fungsi Muat Turun PDF.");
-                return;
-            }
-            const element = document.getElementById('modal-report-body');
+            const element = document.createElement('div');
+            element.style.position = 'absolute';
+            element.style.left = '-9999px';
+            element.style.width = '1200px'; // Set a fixed width for consistent PDF rendering
+            element.innerHTML = window.renderReportContent();
+            document.body.appendChild(element);
+
+            const chartCanvas = element.querySelector('#modalReportPieChart');
             const score = window.calculateScore();
-            const filename = `Laporan_eHalalGAP_${score.readinessScore.toFixed(0)}%_${new Date().toISOString().slice(0, 10)}.pdf`;
-            const opt = { margin: 1, filename, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 3, useCORS: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
-            html2pdf().set(opt).from(element).save();
+
+            if (score.totalAnswered > 0) {
+                 window.renderPieChart(score.answerBreakdown, chartCanvas);
+            }
+
+            const clientIdentifier = window.appState.answers.nama_perniagaan || window.auth.currentUser.email || 'Klien';
+            const filename = `Laporan_eHalalGAP_${clientIdentifier.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+            const opt = { margin: 1, filename, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
+            
+            setTimeout(() => {
+                html2pdf().set(opt).from(element).save().then(() => {
+                    document.body.removeChild(element);
+                });
+            }, 500);
         };
 
         window.renderLogin = () => {
@@ -499,7 +547,7 @@
 
         window.renderProgress = (score) => {
             const progressAnswered = (score.totalScoredQuestions > 0 ? (score.totalAnswered / score.totalScoredQuestions) * 100 : 0).toFixed(0);
-            return `<div class="mb-8 p-6 bg-white rounded-xl shadow-lg border-l-4 border-teal-500"><h3 class="text-xl font-semibold mb-4 text-gray-800">Kemajuan Penilaian</h3><div class="bg-blue-50 border-l-4 border-blue-400 text-blue-700 p-4 mb-6 rounded-lg" role="alert"><p class="font-bold">Nota Penting:</p><p class="text-sm">Sila jawab semua soalan dengan jujur. Penilaian ini bertujuan untuk mengenal pasti jurang (GAP) sebenar syarikat anda.</p></div><div class="flex flex-col items-center justify-center"><div class="flex flex-col items-center"><div class="progress-ring" style="--progress: ${progressAnswered}%;"><div class="progress-ring-inner">${progressAnswered}%</div></div><p class="mt-4 text-lg font-medium">Soalan Dijawab</p><p class="mt-1 text-sm text-gray-500">(${score.totalAnswered} dari ${score.totalScoredQuestions} soalan)</p></div></div></div>`;
+            return `<div class="mb-8 p-6 bg-white rounded-xl shadow-lg border-l-4 border-teal-500"><h3 class="text-xl font-semibold mb-4 text-gray-800">Kemajuan Penilaian</h3><div class="bg-blue-50 border-l-4 border-blue-400 text-blue-700 p-4 mb-6 rounded-lg" role="alert"><p class="font-bold">Nota Penting:</p><p class="text-sm">Sila jawab semua soalan dengan jujur. Penilaian ini bertujuan untuk mengenal pasti jurang (GAP) sebenar perniagaan anda.</p></div><div class="flex flex-col items-center justify-center"><div class="flex flex-col items-center"><div class="progress-ring" style="--progress: ${progressAnswered}%;"><div class="progress-ring-inner">${progressAnswered}%</div></div><p class="mt-4 text-lg font-medium">Soalan Dijawab</p><p class="mt-1 text-sm text-gray-500">(${score.totalAnswered} dari ${score.totalScoredQuestions} soalan)</p></div></div></div>`;
         };
 
         window.renderTabContent = () => {
@@ -512,7 +560,11 @@
                 step.questions.forEach((question, index) => {
                     const id = `${step.id}_${index}`;
                     const answer = currentAnswers[id] || '';
-                    html += `<div class="bg-white p-5 rounded-xl shadow-lg border-t-4 border-teal-500/50"><p class="font-medium mb-3">${index + 1}. ${question}</p><div class="flex flex-wrap gap-3">${['YA', 'TIDAK'].map(option => `<button onclick="window.handleAnswer('${id}', '${option}', true)" class="px-5 py-2 rounded-full text-sm font-semibold transition ${answer === option ? 'bg-teal-600 text-white shadow-md' : 'bg-gray-100 hover:bg-teal-100'}">${option}</button>`).join('')}</div></div>`;
+                    let options = ['YA', 'TIDAK'];
+                    if (index === 3 || index === 4) {
+                        options.push('Tidak Berkenaan');
+                    }
+                    html += `<div class="bg-white p-5 rounded-xl shadow-lg border-t-4 border-teal-500/50"><p class="font-medium mb-3">${index + 1}. ${question}</p><div class="flex flex-wrap gap-3">${options.map(option => `<button onclick="window.handleAnswer('${id}', '${option}', true)" class="px-5 py-2 rounded-full text-sm font-semibold transition ${answer === option ? 'bg-teal-600 text-white shadow-md' : 'bg-gray-100 hover:bg-teal-100'}">${option}</button>`).join('')}</div></div>`;
                 });
                 html += '</div>';
 
@@ -530,8 +582,7 @@
                 questions.forEach((question, index) => {
                     const id = `${step.id}_${index}`;
                     const answer = currentAnswers[id] || '';
-                    const pointValue = questionPoints[step.id]?.[index] || 0;
-                    html += `<div class="bg-white p-5 rounded-xl shadow-lg border-t-4 border-teal-500/50"><p class="font-medium mb-3">${index + 1}. ${question} ${pointValue > 0 ? `<span class="text-xs text-teal-600 font-semibold ml-2">(${pointValue} Mata)</span>` : ''}</p><div class="flex flex-wrap gap-3">${['YA', 'TIDAK'].map(option => `<button onclick="window.handleAnswer('${id}', '${option}', true)" class="px-5 py-2 rounded-full text-sm font-semibold transition ${answer === option ? 'bg-teal-600 text-white shadow-md' : 'bg-gray-100 hover:bg-teal-100'}">${option}</button>`).join('')}</div></div>`;
+                    html += `<div class="bg-white p-5 rounded-xl shadow-lg border-t-4 border-teal-500/50"><p class="font-medium mb-3">${index + 1}. ${question}</p><div class="flex flex-wrap gap-3">${['YA', 'TIDAK'].map(option => `<button onclick="window.handleAnswer('${id}', '${option}', true)" class="px-5 py-2 rounded-full text-sm font-semibold transition ${answer === option ? 'bg-teal-600 text-white shadow-md' : 'bg-gray-100 hover:bg-teal-100'}">${option}</button>`).join('')}</div></div>`;
                 });
                 html += '</div>';
             } else if (step.type === 'selection') {
@@ -545,7 +596,7 @@
                     let inputAttributes = `type="radio" name="${step.id}" id="${id}" value="YA" ${isChecked ? 'checked' : ''} onchange="window.handleAnswer('${id}', 'YA', true)" class="mt-1 h-5 w-5 text-teal-600 border-gray-300 rounded focus:ring-2 focus:ring-teal-500 flex-shrink-0"`;
                     let spanClasses = "ml-3 text-gray-700";
                     let disabledText = '';
-
+                    
                     if (step.id === 'kategori' && (index === 2 || index === 3)) {
                         isDisabled = true;
                         labelClasses = "flex items-start p-4 bg-gray-100 rounded-xl shadow-sm cursor-not-allowed transition duration-150 w-full opacity-60";
@@ -553,6 +604,15 @@
                         spanClasses = "ml-3 text-gray-500";
                         disabledText = '<span class="ml-2 text-xs font-semibold text-gray-500">(Tidak Aktif)</span>';
                     }
+                    
+                    if (step.id === 'skim' && ![0, 1, 3, 4].includes(index)) { // If index is NOT 0, 1, 3, or 4
+                         isDisabled = true;
+                        labelClasses = "flex items-start p-4 bg-gray-100 rounded-xl shadow-sm cursor-not-allowed transition duration-150 w-full opacity-60";
+                        inputAttributes = `type="radio" name="${step.id}" id="${id}" value="YA" disabled class="mt-1 h-5 w-5 text-gray-400 border-gray-300 rounded flex-shrink-0"`;
+                        spanClasses = "ml-3 text-gray-500";
+                        disabledText = '<span class="ml-2 text-xs font-semibold text-gray-500">(Akan Datang)</span>';
+                    }
+
 
                     html += `
                         <label for="${id}" class="${labelClasses}">
@@ -563,13 +623,14 @@
                 });
                 html += '</div>';
             } else if (step.type === 'form') {
-                const fields = ['Nama Syarikat', 'No SSM (jika ada)', 'Alamat', 'No Telefon', 'Nama Pemilik', 'Jualan tahunan syarikat', 'Bilangan pekerja keseluruhan'];
+                const fields = ['Nama Perniagaan', 'No SSM (jika ada)', 'Alamat', 'No Telefon', 'Nama Pemilik', 'Jualan tahunan perniagaan', 'Bilangan pekerja keseluruhan'];
+                const mandatoryFields = ['Nama Perniagaan', 'No SSM (jika ada)', 'Alamat', 'No Telefon'];
                 html += '<div class="space-y-6 bg-white p-6 rounded-xl shadow-lg">';
                 fields.forEach(field => {
                     const id = field.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_');
                     const value = currentAnswers[id] || '';
                     const isNumber = field.includes('Jualan') || field.includes('Bilangan');
-                    html += `<div><label for="${id}" class="block text-sm font-medium mb-1">${field} ${['Nama Syarikat', 'No SSM (jika ada)', 'Alamat', 'No Telefon'].includes(field) ? '<span class="text-red-500">*</span>' : ''}</label><input type="${isNumber ? 'number' : 'text'}" id="${id}" value="${value}" onchange="window.handleAnswer('${id}', this.value, false)" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="${field}"></div>`;
+                    html += `<div><label for="${id}" class="block text-sm font-medium mb-1">${field} ${mandatoryFields.includes(field) ? '<span class="text-red-500">*</span>' : ''}</label><input type="${isNumber ? 'number' : 'text'}" id="${id}" value="${value}" onchange="window.handleAnswer('${id}', this.value, false)" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="${field}"></div>`;
                 });
                 html += '</div>';
             } else if (step.type === 'textarea') {
@@ -579,10 +640,10 @@
             } else if (step.type === 'result') {
                 const score = window.calculateScore();
                 html += window.renderReportSummary(score);
-                html += `<div class="mt-8 flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4"><button onclick="window.toggleModal(true)" class="btn-secondary px-6 py-3 rounded-xl font-semibold border hover:bg-gray-200">Preview Laporan Penuh</button><button onclick="window.handlePaymentGate()" class="inline-flex items-center px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl ${window.appState.isPaidClient ? 'btn-primary text-white' : 'bg-gray-300 text-gray-700 hover:bg-gray-400'}">Muat Turun Laporan (PDF) ${window.appState.isPaidClient ? '' : '(Bayaran Diperlukan)'}</button></div><div class="mt-8 pt-4 border-t"><p class="text-xs text-gray-500 italic font-semibold">Notis Penafian:</p><p class="text-xs mt-1">Laporan ini disediakan berdasarkan penilaian kendiri. Ia hanyalah untuk rujukan dan tidak boleh dianggap sebagai bukti rasmi.</p></div>`;
+                html += `<div class="mt-8 flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4"><button onclick="window.toggleModal(true)" class="btn-primary text-white px-8 py-4 rounded-xl font-semibold shadow-lg hover:shadow-xl inline-flex items-center">Preview Laporan Penuh</button></div><div class="mt-8 pt-4 border-t"><p class="text-xs text-gray-500 italic font-semibold">Notis Penafian:</p><p class="text-xs mt-1">Laporan ini disediakan berdasarkan penilaian kendiri. Ia hanyalah untuk rujukan dan tidak boleh dianggap sebagai bukti rasmi.</p></div>`;
                 setTimeout(() => {
                     if (score.totalAnswered > 0) {
-                        pieChartInstance = window.renderPieChart(score.answerBreakdown, 'reportPieChart', pieChartInstance);
+                        window.renderPieChart(score.answerBreakdown, 'reportPieChart');
                         window.getGeminiSummary(score).then(summary => window.updateAiSummaryDisplay(summary));
                     }
                 }, 100);
@@ -593,23 +654,32 @@
         window.renderReportSummary = (score) => {
             const progress = score.readinessScore;
             let status = '', statusColor = '', recommendation = '';
-            if (progress >= 80) { status = 'Bersedia'; statusColor = 'bg-green-100 text-green-700 border-green-500'; recommendation = 'Tahniah! Syarikat anda menunjukkan kesediaan tinggi.'; }
-            else if (progress >= 60) { status = 'Kurang Bersedia'; statusColor = 'bg-yellow-100 text-yellow-700 border-yellow-500'; recommendation = 'Syarikat anda di tahap sederhana. Fokus pada jawapan "TIDAK".'; }
-            else { status = 'Tidak Bersedia'; statusColor = 'bg-red-100 text-red-700 border-red-500'; recommendation = 'Syarikat anda memerlukan penambahbaikan signifikan.'; }
-            return `<div class="space-y-8"><div class="p-6 rounded-xl shadow-lg border"><h3 class="text-2xl font-bold mb-4 text-center">Ringkasan Keputusan</h3><div class="flex flex-col sm:flex-row items-center justify-around text-center space-y-4 sm:space-y-0"><div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl mt-1">Peratus Kesediaan</p></div><div><p class="text-5xl font-extrabold">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl mt-1">Mata Halal Diperolehi</p></div></div></div><div class="text-center p-6 rounded-xl border-4 ${statusColor} shadow-md"><p class="text-2xl font-bold">Status: <span class="text-3xl">${status.toUpperCase()}</span></p><p class="mt-4">${recommendation}</p></div><div class="p-6 bg-teal-50 rounded-xl shadow-lg border-l-4 border-teal-600"><h4 class="text-xl font-semibold mb-3">Ringkasan AI Gemini</h4><div id="ai-summary-content" class="text-base italic"><p class="animate-pulse text-teal-600">AI sedang menganalisis data...</p></div></div><div class="p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Jawapan</h4><div class="flex justify-center w-full max-w-lg mx-auto"><canvas id="reportPieChart" width="400" height="400"></canvas></div></div></div>`;
+            if (progress >= 80) { status = 'Bersedia'; statusColor = 'bg-green-100 text-green-700 border-green-500'; recommendation = 'Tahniah! Perniagaan anda menunjukkan ketersediaan tinggi.'; }
+            else if (progress >= 60) { status = 'Kurang Bersedia'; statusColor = 'bg-yellow-100 text-yellow-700 border-yellow-500'; recommendation = 'Perniagaan anda di tahap sederhana. Fokus pada jawapan "TIDAK".'; }
+            else { status = 'Tidak Bersedia'; statusColor = 'bg-red-100 text-red-700 border-red-500'; recommendation = 'Perniagaan anda memerlukan penambahbaikan signifikan.'; }
+            return `<div class="space-y-8"><div class="p-6 rounded-xl shadow-lg border"><h3 class="text-2xl font-bold mb-4 text-center">Ringkasan Keputusan</h3><div class="flex flex-col sm:flex-row items-center justify-around text-center space-y-4 sm:space-y-0"><div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl mt-1">Peratus Ketersediaan</p></div><div><p class="text-5xl font-extrabold">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl mt-1">Mata Halal Diperolehi</p></div></div></div><div class="text-center p-6 rounded-xl border-4 ${statusColor} shadow-md"><p class="text-2xl font-bold">Status: <span class="text-3xl">${status.toUpperCase()}</span></p><p class="mt-4">${recommendation}</p></div><div class="p-6 bg-teal-50 rounded-xl shadow-lg border-l-4 border-teal-600"><h4 class="text-xl font-semibold mb-3">Ringkasan AI Gemini</h4><div id="ai-summary-content" class="text-base italic"><p class="animate-pulse text-teal-600">AI sedang menganalisis data...</p></div></div><div class="p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Jawapan</h4><div class="flex justify-center w-full max-w-lg mx-auto"><canvas id="reportPieChart" width="400" height="400"></canvas></div></div></div>`;
         };
 
         window.renderReportContent = () => {
             const score = window.calculateScore();
             const progress = score.readinessScore;
             const answers = window.appState.answers;
+            const clientIdentifier = answers.nama_perniagaan || (window.auth.currentUser ? window.auth.currentUser.email : window.appState.userId);
+
             const scoredSections = ['syarat', 'premis', 'bahan', 'sanitasi', 'pekerja', 'dokumentasi'];
             let status = '', statusColor = '', recommendation = '';
-            if (progress >= 80) { status = 'Bersedia'; statusColor = 'bg-green-100 text-green-700 border-green-500'; recommendation = 'Tahniah! Syarikat anda menunjukkan kesediaan tinggi.'; } 
-            else if (progress >= 60) { status = 'Kurang Bersedia'; statusColor = 'bg-yellow-100 text-yellow-700 border-yellow-500'; recommendation = 'Syarikat anda di tahap sederhana. Fokus pada jawapan "TIDAK".'; } 
-            else { status = 'Tidak Bersedia'; statusColor = 'bg-red-100 text-red-700 border-red-500'; recommendation = 'Syarikat anda memerlukan penambahbaikan signifikan.'; }
+            if (progress >= 80) { status = 'Bersedia'; statusColor = 'bg-green-100 text-green-700 border-green-500'; recommendation = 'Tahniah! Perniagaan anda menunjukkan ketersediaan tinggi.'; } 
+            else if (progress >= 60) { status = 'Kurang Bersedia'; statusColor = 'bg-yellow-100 text-yellow-700 border-yellow-500'; recommendation = 'Perniagaan anda di tahap sederhana. Fokus pada jawapan "TIDAK".'; } 
+            else { status = 'Tidak Bersedia'; statusColor = 'bg-red-100 text-red-700 border-red-500'; recommendation = 'Perniagaan anda memerlukan penambahbaikan signifikan.'; }
             const clientReview = answers['ulasan_cabaran_utama'];
-            return `<div id="pdf-content-container" class="p-8 space-y-8 bg-white"><div class="text-center pb-4 border-b"><h1 class="text-3xl font-extrabold">Laporan Semakan Jurang Halal</h1><p class="text-lg text-gray-500 mt-1">ID Klien: ${window.appState.userId}</p></div><div class="p-6 rounded-xl shadow-lg border"><h3 class="text-2xl font-bold mb-4 text-center">Ringkasan Keputusan</h3><div class="flex flex-col sm:flex-row items-center justify-around text-center"><div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl mt-1">Kesediaan</p></div><div><p class="text-5xl font-extrabold">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl mt-1">Mata Halal</p></div></div></div><div class="text-center p-6 rounded-xl border-4 ${statusColor} shadow-md"><p class="text-2xl font-bold">Status: <span class="text-3xl">${status.toUpperCase()}</span></p><p class="mt-4">${recommendation}</p></div><div class="p-6 bg-teal-50 rounded-xl shadow-lg border-l-4 border-teal-600"><h4 class="text-xl font-semibold mb-3">Ringkasan AI Gemini</h4><div class="text-base italic">${document.getElementById('ai-summary-content')?.innerHTML || '<p>Menjana...</p>'}</div></div><div class="p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Maklumat Syarikat</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">${['Nama Syarikat','No SSM (jika ada)','Alamat','No Telefon','Nama Pemilik','Jualan tahunan syarikat','Bilangan pekerja keseluruhan'].map(f => `<p><strong>${f}:</strong> ${answers[f.toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_')] || '- '}</p>`).join('')}</div></div>${clientReview ? `<div class="p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Ulasan Klien</h4><p class="text-sm whitespace-pre-wrap">${clientReview}</p></div>` : ''}<div class="p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Jawapan</h4><div class="flex justify-center w-full max-w-lg mx-auto"><canvas id="modalReportPieChart" width="400" height="400"></canvas></div></div><div class="p-6 bg-white rounded-xl shadow-lg border-t-4 border-red-500"><h4 class="text-xl font-bold text-red-700 mb-4 border-b pb-2">Jurang Pematuhan Kritikal</h4>${window.renderGapsTable(answers, scoredSections)}</div><div class="p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Mengikut Bahagian</h4>${scoredSections.map(sId => { const qs = (sId === 'syarat') ? flowSteps.find(s=>s.id===sId).questions : qaQuestions[sId]; const pts = questionPoints[sId] || []; let secMax=0, secScore=0; pts.forEach(p=>{secMax+=p;}); qs.forEach((q,idx) => { const ans = answers[`${sId}_${idx}`]; let isReady= (ans==='YA'); if(sId==='bahan'&&(idx===3||idx===4)) isReady=(ans==='TIDAK'); if(isReady) secScore+=pts[idx]; }); const secPerc = secMax > 0 ? (secScore / secMax) * 100 : 0; const secTitle = flowSteps.find(s=>s.id===sId)?.title.replace(/^\d+\.\s*/, '') || sId; const barColor = secPerc >= 80 ? 'bg-green-500' : secPerc >= 60 ? 'bg-yellow-500' : 'bg-red-500'; return `<div class="mb-6 border-b pb-4"><h5 class="text-lg font-bold">${secTitle}</h5><div class="flex justify-between items-center mb-1"><span class="text-sm">Skor: ${secScore}/${secMax}</span><span class="text-lg font-bold">${secPerc.toFixed(0)}%</span></div><div class="w-full bg-gray-200 rounded-full h-3"><div class="${barColor} h-3 rounded-full" style="width: ${secPerc.toFixed(0)}%"></div></div></div>`; }).join('')}</div><div class="text-xs text-gray-500 text-center pt-4 border-t">&copy; Hak Cipta Ace UniKL MICET 2025.</div></div>`;
+
+            return `<div id="pdf-content-container" class="p-8 space-y-8 bg-white">
+                <div class="text-center pb-4 border-b">
+                    <h2 class="text-3xl font-extrabold text-gray-800">eHalal<span class="text-teal-600">GAP</span></h2>
+                    <h1 class="text-2xl font-bold text-gray-700 mt-2">Laporan Semakan Jurang Halal</h1>
+                    <p class="text-lg text-gray-500 mt-1">${clientIdentifier}</p>
+                </div>
+                <div class="p-6 rounded-xl shadow-lg border"><h3 class="text-2xl font-bold mb-4 text-center">Ringkasan Keputusan</h3><div class="flex flex-col sm:flex-row items-center justify-around text-center"><div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl mt-1">Ketersediaan</p></div><div><p class="text-5xl font-extrabold">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl mt-1">Mata Halal</p></div></div></div><div class="text-center p-6 rounded-xl border-4 ${statusColor} shadow-md"><p class="text-2xl font-bold">Status: <span class="text-3xl">${status.toUpperCase()}</span></p><p class="mt-4">${recommendation}</p></div><div class="p-6 bg-teal-50 rounded-xl shadow-lg border-l-4 border-teal-600"><h4 class="text-xl font-semibold mb-3">Ringkasan AI Gemini</h4><div class="text-base italic">${document.getElementById('ai-summary-content')?.innerHTML || '<p>Menjana...</p>'}</div></div><div class="p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Maklumat Perniagaan</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-bold">${['Nama Perniagaan','No SSM (jika ada)','Alamat','No Telefon','Nama Pemilik','Jualan tahunan perniagaan','Bilangan pekerja keseluruhan'].map(f => `<p><strong>${f}:</strong> ${answers[f.toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_')] || '- '}</p>`).join('')}</div></div>${clientReview ? `<div class="p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Ulasan Klien</h4><p class="text-sm whitespace-pre-wrap">${clientReview}</p></div>` : ''}<div class="p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Jawapan</h4><div class="flex justify-center w-full max-w-lg mx-auto"><canvas id="modalReportPieChart" width="400" height="400"></canvas></div></div><div class="p-6 bg-white rounded-xl shadow-lg border-t-4 border-red-500"><h4 class="text-xl font-bold text-red-700 mb-4 border-b pb-2">Jurang Pematuhan Kritikal</h4>${window.renderGapsTable(answers, scoredSections)}</div><div class="p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Mengikut Bahagian</h4>${scoredSections.map(sId => { const qs = (sId === 'syarat') ? flowSteps.find(s=>s.id===sId).questions : qaQuestions[sId]; const pts = questionPoints[sId] || []; let secMax=0, secScore=0; pts.forEach(p=>{secMax+=p;}); qs.forEach((q,idx) => { const ans = answers[`${sId}_${idx}`]; let isReady= (ans==='YA'); if(sId==='bahan'&& idx===3) isReady=(ans==='TIDAK'); if(isReady) secScore+=pts[idx]; }); const secPerc = secMax > 0 ? (secScore / secMax) * 100 : 0; const secTitle = flowSteps.find(s=>s.id===sId)?.title.replace(/^\d+\.\s*/, '') || sId; const barColor = secPerc >= 80 ? 'bg-green-500' : secPerc >= 60 ? 'bg-yellow-500' : 'bg-red-500'; return `<div class="mb-6 border-b pb-4"><h5 class="text-lg font-bold">${secTitle}</h5><div class="flex justify-between items-center mb-1"><span class="text-sm">Skor: ${secScore}/${secMax}</span><span class="text-lg font-bold">${secPerc.toFixed(0)}%</span></div><div class="w-full bg-gray-200 rounded-full h-3"><div class="${barColor} h-3 rounded-full" style="width: ${secPerc.toFixed(0)}%"></div></div></div>`; }).join('')}</div><div class="text-xs text-gray-500 text-center pt-4 border-t">&copy; Hak Cipta ACE UniKL MICET 2025.</div></div>`;
         };
 
         window.handleAnswer = (key, value, shouldRender) => {
@@ -630,16 +700,27 @@
             }
         };
 
+        window.goToStep = (index) => {
+            const resultStepIndex = flowSteps.findIndex(step => step.id === 'result');
+            if (index === resultStepIndex && !window.appState.assessmentCompleted) {
+                console.log("Sila lengkapkan penilaian sebelum melihat laporan.");
+                return; 
+            }
+
+            if (index >= 0 && index < flowSteps.length) {
+                window.updateState({ currentStep: index });
+            }
+        };
+
         window.changeStep = (direction) => {
-            const newStep = window.appState.currentStep + direction;
-            if (newStep >= 0 && newStep < flowSteps.length) {
-                window.updateState({ currentStep: newStep });
-                setTimeout(() => {
-                    document.getElementById('main-content-start')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    const tabContainer = document.getElementById('tab-nav-container');
-                    const activeTabButton = tabContainer?.children[newStep];
-                    if (activeTabButton) activeTabButton.scrollIntoView({ behavior: 'smooth', inline: 'center' });
-                }, 50);
+            const currentStepIndex = window.appState.currentStep;
+            const newStepIndex = currentStepIndex + direction;
+            const isUlasanStep = flowSteps[currentStepIndex].id === 'ulasan';
+
+            if (isUlasanStep && direction > 0) {
+                window.updateState({ currentStep: newStepIndex, assessmentCompleted: true });
+            } else if (newStepIndex >= 0 && newStepIndex < flowSteps.length) {
+                window.updateState({ currentStep: newStepIndex });
             }
         };
 
@@ -651,9 +732,22 @@
             }
             const currentStepIndex = window.appState.currentStep;
             const score = window.calculateScore(); 
-            const disableNext = currentStepIndex === flowSteps.length - 1;
-            const introductionHtml = `<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full"><div class="mb-8 p-6 bg-white rounded-xl shadow-lg border-l-4 border-teal-500"><h3 class="text-xl font-semibold mb-2">Mengapa eHalalGAP?</h3><p class="text-base leading-relaxed">e-HalalGAP membantu anda menjejaki kesiapsiagaan, menggambarkan kemajuan, dan mengurus dokumentasi di satu tempat, memudahkan kerjasama dengan perunding anda.</p></div></div>`;
-            appContainer.innerHTML = `<div class="min-h-screen bg-gray-50 flex flex-col"><header class="hero-bg py-4 px-4 shadow-lg"><div class="max-w-6xl mx-auto text-white flex justify-between items-center"><div><h1 class="text-xl sm:text-2xl font-extrabold">Semakan Jurang Halal (eHalalGAP)</h1><p class="mt-1 text-sm text-gray-200">Analisis Kendiri untuk Pensijilan Halal</p></div><button onclick="window.logoutClient()" class="bg-red-500 text-white hover:bg-red-600 px-4 py-2 rounded-lg text-sm font-semibold flex items-center"><svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>Log Keluar</button></div></header><main class="flex-grow max-w-6xl mx-auto py-8 w-full">${introductionHtml}<div class="px-4 sm:px-6 lg:px-8" id="main-content-start">${window.renderProgress(score)}<nav class="flex overflow-x-auto whitespace-nowrap space-x-2 sm:space-x-4 mb-8 p-1 bg-white rounded-xl shadow-md" id="tab-nav-container">${flowSteps.map((step, index) => `<button class="py-3 px-3 sm:px-4 text-sm font-medium transition rounded-lg cursor-default ${index === currentStepIndex ? 'tab-active bg-teal-50' : 'text-gray-600'}">${step.title.replace(/^\d+\.\s*/, '')}</button>`).join('')}</nav><div class="p-6 bg-white rounded-xl shadow-2xl border-t-4 border-teal-500">${window.renderTabContent()}</div><div class="mt-8 flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0"><button onclick="window.changeStep(-1)" ${currentStepIndex === 0 ? 'disabled' : ''} class="w-full sm:w-auto btn-secondary px-6 py-3 rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>Sebelumnya</button><div class="flex flex-col items-center space-y-2 w-full sm:w-auto"><button onclick="window.manualSave()" ${currentStepIndex === flowSteps.length - 1 ? 'disabled' : ''} id="save-progress-btn" class="w-full sm:w-auto inline-flex items-center justify-center btn-secondary px-6 py-3 rounded-xl font-semibold hover:bg-teal-100 text-teal-700 disabled:opacity-50"><svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>Simpan Kemajuan</button><p id="save-status-message" class="text-xs text-gray-500 opacity-0 transition"></p></div><button onclick="window.changeStep(1)" ${disableNext ? 'disabled' : ''} class="w-full sm:w-auto btn-primary px-6 py-3 rounded-xl text-white font-semibold disabled:opacity-50 flex items-center justify-center">Seterusnya<svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></button></div></div></main><footer class="bg-gray-800 text-white p-4 mt-8"><div class="max-w-6xl mx-auto text-center text-sm"><p>&copy; Hak Cipta Ace UniKL MICET 2025.</p></div></footer></div><div id="report-modal" class="modal"><div class="modal-content"><div class="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-xl z-10"><h2 class="text-2xl font-bold">Preview Laporan Penuh</h2><button onclick="window.toggleModal(false)" class="text-gray-500 hover:text-gray-800"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button></div><div id="modal-report-body"></div><div class="sticky bottom-0 bg-gray-50 border-t p-4 flex justify-center rounded-b-xl z-10 space-x-4"><button onclick="window.toggleModal(false)" class="btn-secondary px-6 py-3 rounded-xl font-semibold">Tutup</button><button onclick="window.handlePaymentGate()" class="btn-primary px-6 py-3 rounded-xl text-white font-semibold">Muat Turun (Bayaran)</button></div></div></div>`;
+            const isUlasanStep = flowSteps[currentStepIndex].id === 'ulasan';
+            const isResultStep = flowSteps[currentStepIndex].id === 'result';
+            const nextButtonText = isUlasanStep ? 'Hantar Penilaian' : 'Seterusnya';
+
+            const introductionHtml = `<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full"><div class="mb-8 p-6 bg-white rounded-xl shadow-lg border-l-4 border-teal-500"><h3 class="text-xl font-semibold mb-2">Mengapa eHalalGAP?</h3><p class="text-base leading-relaxed">e-HalalGAP membantu anda menjejaki ketersediaan, menggambarkan kemajuan, dan mengurus dokumentasi di satu tempat, memudahkan kerjasama dengan perunding anda.</p></div></div>`;
+            appContainer.innerHTML = `<div class="min-h-screen bg-gray-50 flex flex-col"><header class="hero-bg py-4 px-4 shadow-lg"><div class="max-w-6xl mx-auto text-white flex justify-between items-center"><div><h1 class="text-xl sm:text-2xl font-extrabold">Semakan Jurang Halal (eHalalGAP)</h1><p class="mt-1 text-sm text-gray-200">Analisis Kendiri untuk Pensijilan Halal</p></div><button onclick="window.logoutClient()" class="bg-red-500 text-white hover:bg-red-600 px-4 py-2 rounded-lg text-sm font-semibold flex items-center"><svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>Log Keluar</button></div></header><main class="flex-grow max-w-6xl mx-auto py-8 w-full">${introductionHtml}<div class="px-4 sm:px-6 lg:px-8" id="main-content-start">${window.renderProgress(score)}<nav class="flex overflow-x-auto whitespace-nowrap space-x-2 sm:space-x-4 mb-8 p-1 bg-white rounded-xl shadow-md" id="tab-nav-container">${flowSteps.map((step, index) => {
+                const isResultTab = step.id === 'result';
+                const isCompleted = window.appState.assessmentCompleted;
+                let tabClasses = 'py-3 px-3 sm:px-4 text-sm font-medium transition rounded-lg';
+                if (isResultTab && !isCompleted) {
+                    tabClasses += ' cursor-not-allowed text-gray-400 bg-gray-50';
+                } else {
+                    tabClasses += ` cursor-pointer ${index === currentStepIndex ? 'tab-active bg-teal-50' : 'text-gray-600 hover:bg-gray-100'}`;
+                }
+                return `<button onclick="window.goToStep(${index})" class="${tabClasses}">${step.title.replace(/^\d+\.\s*/, '')}</button>`;
+            }).join('')}</nav><div class="p-6 bg-white rounded-xl shadow-2xl border-t-4 border-teal-500">${window.renderTabContent()}</div><div class="mt-8 flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0"><button onclick="window.changeStep(-1)" ${currentStepIndex === 0 ? 'disabled' : ''} class="w-full sm:w-auto btn-secondary px-6 py-3 rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>Sebelumnya</button><div class="flex flex-col items-center space-y-2 w-full sm:w-auto"><button onclick="window.manualSave()" ${isResultStep ? 'disabled' : ''} id="save-progress-btn" class="w-full sm:w-auto inline-flex items-center justify-center btn-secondary px-6 py-3 rounded-xl font-semibold hover:bg-teal-100 text-teal-700 disabled:opacity-50"><svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>Simpan Kemajuan</button><p id="save-status-message" class="text-xs text-gray-500 opacity-0 transition"></p></div><button onclick="window.changeStep(1)" ${isResultStep ? 'disabled' : ''} class="w-full sm:w-auto btn-primary px-6 py-3 rounded-xl text-white font-semibold disabled:opacity-50 flex items-center justify-center">${nextButtonText}<svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></button></div></div></main><footer class="bg-gray-800 text-white p-4 mt-8"><div class="max-w-6xl mx-auto text-center text-sm"><p>&copy; Hak Cipta ACE UniKL MICET 2025.</p></div></footer></div><div id="report-modal" class="modal"><div class="modal-content"><div class="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-xl z-10"><h2 class="text-2xl font-bold">Preview Laporan Penuh</h2><button onclick="window.toggleModal(false)" class="text-gray-500 hover:text-gray-800"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button></div><div id="modal-report-body"></div><div class="sticky bottom-0 bg-gray-50 border-t p-4 flex justify-center rounded-b-xl z-10 space-x-4"><button onclick="window.toggleModal(false)" class="btn-secondary px-6 py-3 rounded-xl font-semibold">Tutup</button><button onclick="window.handlePaymentGate()" class="btn-primary px-6 py-3 rounded-xl text-white font-semibold">Muat Turun PDF</button></div></div></div>`;
         };
     </script>
 </head>
