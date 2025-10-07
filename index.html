@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>eHalalGAP | Semakan Jurang Halal Digital untuk Pensijilan JAKIM</title>
     <!-- SEO Meta Tags -->
-    <meta name="description" content="Sistem eHalalGAP: Platform analisis kendiri jurang Halal (GAP analysis) yang komprehensif untuk usahawan PKS Malaysia. Semak kesiapsiagaan Halal JAKIM anda hari ini!">
-    <meta name="keywords" content="Pensijilan Halal JAKIM, Semakan Jurang Halal, eHalalGAP, Usahawan PKS Malaysia, Kesiapsiagaan Halal, Audit Halal Digital, UniKL MICET">
-    <meta name="author" content="Ace UniKL MICET">
+    <meta name="description" content="Sistem eHalalGAP: Platform analisis kendiri jurang Halal (GAP analysis) yang komprehensif untuk usahawan PKS Malaysia. Semak ketersediaan Halal JAKIM anda hari ini!">
+    <meta name="keywords" content="Pensijilan Halal JAKIM, Semakan Jurang Halal, eHalalGAP, Usahawan PKS Malaysia, Ketersediaan Halal, Audit Halal Digital, UniKL MICET">
+    <meta name="author" content="ACE UniKL MICET">
 
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -19,7 +19,9 @@
             background-color: #f7f9fb;
         }
         .hero-bg {
-            background: linear-gradient(135deg, #1a4f78 0%, #0d9488 100%);
+            background-image: linear-gradient(rgba(26, 79, 120, 0.7), rgba(13, 148, 136, 0.7)), url('https://raw.githubusercontent.com/goldigger79/eHalalGAP/66e4f4d54f3d4cc516b5194786c35ee8f2e8f519/banner1.png');
+            background-size: cover;
+            background-position: center;
         }
         .btn-primary {
             background-color: #facc15; /* Yellow/Gold for visibility */
@@ -51,17 +53,9 @@
             <div class="flex justify-between items-center h-16">
                 <!-- Logo/Title -->
                 <div class="flex-shrink-0">
-                    <span class="text-2xl font-extrabold text-gray-800">eHalal<span class="text-teal-600">GAP</span></span>
+                    <a href="/" class="text-2xl font-extrabold text-gray-800">eHalal<span class="text-teal-600">GAP</span></a>
                 </div>
                 
-                <!-- Nav Links (Desktop) -->
-                <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
-                    <a href="#pengenalan" class="text-gray-500 hover:text-teal-600 px-3 py-2 rounded-md text-sm font-medium transition duration-150">Pengenalan</a>
-                    <a href="#ciri" class="text-gray-500 hover:text-teal-600 px-3 py-2 rounded-md text-sm font-medium transition duration-150">Ciri-ciri Utama</a>
-                    <a href="#target" class="text-gray-500 hover:text-teal-600 px-3 py-2 rounded-md text-sm font-medium transition duration-150">Objektif & Sasaran</a>
-                    <a href="#contact" class="text-gray-500 hover:text-teal-600 px-3 py-2 rounded-md text-sm font-medium transition duration-150">Hubungi Kami</a>
-                </div>
-
                 <!-- CTA Button (Desktop) -->
                 <div class="hidden sm:flex items-center">
                     <a href="client.html" class="btn-primary px-4 py-2 text-sm rounded-lg shadow-md hover:shadow-lg">
@@ -82,13 +76,7 @@
 
         <!-- Mobile Menu -->
         <div id="mobile-menu" class="sm:hidden hidden bg-white border-t border-gray-200">
-            <div class="px-2 pt-2 pb-3 space-y-1">
-                <a href="#pengenalan" class="block text-gray-600 hover:bg-gray-100 hover:text-gray-800 px-3 py-2 rounded-md text-base font-medium">Pengenalan</a>
-                <a href="#ciri" class="block text-gray-600 hover:bg-gray-100 hover:text-gray-800 px-3 py-2 rounded-md text-base font-medium">Ciri-ciri Utama</a>
-                <a href="#target" class="block text-gray-600 hover:bg-gray-100 hover:text-gray-800 px-3 py-2 rounded-md text-base font-medium">Objektif & Sasaran</a>
-                <a href="#contact" class="block text-gray-600 hover:bg-gray-100 hover:text-gray-800 px-3 py-2 rounded-md text-base font-medium">Hubungi Kami</a>
-            </div>
-            <div class="px-4 pb-4">
+            <div class="px-4 py-4">
                  <a href="client.html" class="block w-full text-center btn-primary px-4 py-2 text-base rounded-lg shadow-md hover:shadow-lg">
                     Log Masuk Klien
                 </a>
@@ -99,18 +87,16 @@
     <!-- Hero Section (Strong Visual Pitch) -->
     <header class="hero-bg py-24 sm:py-32">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white">
+            <img src="https://raw.githubusercontent.com/goldigger79/eHalalGAP/682027c1dcd0c83bb9d3bbd6c0554b9018527e37/logo%20micet.png" alt="Logo UniKL MICET" class="mx-auto h-24 mb-6">
             <h1 class="text-5xl sm:text-6xl font-extrabold tracking-tight mb-4">
                 Platform Semakan Jurang Halal (eHalalGAP) Digital No. 1 Malaysia
             </h1>
             <p class="mt-4 text-xl sm:text-2xl font-light max-w-4xl mx-auto">
-                Ukur Kesiapsiagaan Syarikat Anda untuk Pensijilan Halal JAKIM dengan Tepat dan Cepat. Mulakan Audit Kendiri Digital Anda Hari Ini!
+                Ukur Ketersediaan Perniagaan Anda untuk Pensijilan Halal JAKIM dengan Tepat dan Cepat. Mulakan Audit Kendiri Digital Anda Hari Ini!
             </p>
-            <div class="mt-10 flex justify-center space-x-4">
-                <a href="client.html" class="btn-primary px-8 py-4 rounded-xl text-lg shadow-xl uppercase">
-                    Mulakan Analisis GAP Percuma &rarr;
-                </a>
-                <a href="#pengenalan" class="btn-secondary px-8 py-4 rounded-xl text-lg hover:bg-white/10 hidden sm:inline-block">
-                    Lihat Cara Ia Berfungsi
+            <div class="mt-10 flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+                <a href="client.html" class="w-full sm:w-auto btn-primary px-8 py-4 rounded-xl text-lg shadow-xl uppercase">
+                    Mulakan Analisis eHalal<span class="text-teal-800">GAP</span> &rarr;
                 </a>
             </div>
         </div>
@@ -119,135 +105,22 @@
     <!-- Main Content Sections -->
     <main>
         
-        <!-- Section 1: Pengenalan & Objektif (Introduction & Objectives) -->
-        <section id="pengenalan" class="py-16 sm:py-24 bg-white">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="text-center mb-12">
-                    <h2 class="text-4xl font-extrabold text-gray-900 mb-4">Pengenalan eHalalGAP</h2>
-                    <p class="text-lg text-teal-600 font-semibold max-w-3xl mx-auto">
-                        Memperkasa Usahawan PKS Malaysia Mencapai Pematuhan Halal Global.
-                    </p>
-                </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                    <!-- Pengenalan & Masalah -->
-                    <div>
-                        <h3 class="text-2xl font-bold text-gray-800 mb-4">Mengenai Sistem eHalalGAP</h3>
-                        <p class="mt-4 text-gray-600 leading-relaxed">
-                            Pensijilan Halal JAKIM adalah pengiktirafan penting yang membuka pintu kepada pasaran Halal bernilai trilion ringgit. Walau bagaimanapun, proses persediaan dan audit seringkali rumit, memakan masa, dan memerlukan kos yang tinggi, terutamanya bagi usahawan PKS.
-                        </p>
-                         <p class="mt-4 text-gray-600 leading-relaxed font-medium bg-teal-50 p-4 rounded-lg border-l-4 border-teal-500">
-                            **eHalalGAP** dibangunkan sebagai penyelesaian digital yang inovatif. Ia adalah alat Analisis Jurang (GAP Analysis) yang membantu setiap usahawan menilai tahap kesediaan syarikat mereka secara kendiri mengikut Piawaian Halal Malaysia yang ketat sebelum memohon secara rasmi.
-                        </p>
-                    </div>
-
-                    <!-- Objektif -->
-                    <div>
-                        <h3 class="text-2xl font-bold text-gray-800 mb-4">Objektif Pembangunan</h3>
-                        <ul class="space-y-4 text-gray-600 list-disc list-inside pl-4">
-                            <li><strong class="text-teal-600">Demokrasi Akses:</strong> Menyediakan akses mudah dan kos efektif kepada alat penilaian **Kesiapsiagaan Halal** untuk semua saiz perniagaan, terutamanya PKS.</li>
-                            <li><strong class="text-teal-600">Mengurangkan Ralat Audit:</strong> Membantu usahawan mengenal pasti jurang pematuhan yang kritikal (seperti Premis, Bahan Mentah, dan Dokumentasi) dari awal bagi mengurangkan kegagalan dalam audit rasmi JAKIM.</li>
-                            <li><strong class="text-teal-600">Visualisasi Kemajuan:</strong> Menawarkan pandangan **digital** dan **grafik** tentang kemajuan persediaan usahawan, dari Syarat Kelayakan hingga ke Laporan Akhir.</li>
-                            <li><strong class="text-teal-600">Kerjasama Konsultan:</strong> Memudahkan proses konsultasi dengan menyediakan laporan analitik dan ringkasan AI yang jelas untuk perunding Halal.</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Section 2: Ciri-Ciri Utama & Manfaat (Features & Benefits) -->
-        <section id="ciri" class="py-16 sm:py-24 bg-gray-50 border-t border-b">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="text-center mb-12">
-                    <h2 class="text-4xl font-extrabold text-gray-900 mb-4">Ciri-ciri Utama: Memudahkan Permohonan Pensijilan JAKIM</h2>
-                    <p class="text-lg text-gray-600 max-w-4xl mx-auto">
-                        eHalalGAP direka untuk menjadi teman audit digital anda, menukar proses yang rumit kepada langkah-langkah yang terurus dan boleh diukur.
-                    </p>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    <!-- Feature 1: Analisis GAP Berfokus -->
-                    <div class="bg-white p-6 rounded-xl shadow-lg border-t-4 border-teal-600">
-                        <svg class="w-10 h-10 text-teal-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 9H7a2 2 0 01-2-2V5a2 2 0 012-2h10a2 2 0 012 2v14a2 2 0 01-2 2z"></path></svg>
-                        <h4 class="text-xl font-bold text-gray-800 mb-2">Penilaian Kendiri Berstruktur</h4>
-                        <p class="text-gray-600 text-sm">
-                            Sistem mengikut 10 langkah aliran proses Halal JAKIM. Mulakan dengan semakan syarat kelayakan, pemilihan skim yang betul, dan ikuti set soalan bertaraf piawaian yang berfokus kepada Premis, Bahan Mentah, Sanitasi, Pekerja, dan Dokumentasi.
-                        </p>
-                    </div>
-                    
-                    <!-- Feature 2: Ringkasan Analisis AI -->
-                    <div class="bg-white p-6 rounded-xl shadow-lg border-t-4 border-teal-600">
-                        <svg class="w-10 h-10 text-teal-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                        <h4 class="text-xl font-bold text-gray-800 mb-2">Analisis & Nasihat Pintar (Gemini AI)</h4>
-                        <p class="text-gray-600 text-sm">
-                            Jangan hanya dapat skor. Sistem Gemini AI kami menjana ringkasan profesional yang mengenal pasti jurang kritikal, kekuatan anda, dan menyediakan **nasihat bertindak** segera. Ini memudahkan perunding Halal merangka pelan intervensi yang tepat.
-                        </p>
-                    </div>
-
-                    <!-- Feature 3: Pengurusan & Muat Turun Data -->
-                    <div class="bg-white p-6 rounded-xl shadow-lg border-t-4 border-teal-600">
-                        <svg class="w-10 h-10 text-teal-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                        <h4 class="text-xl font-bold text-gray-800 mb-2">Penjejakan & Laporan Boleh Dieksport</h4>
-                        <p class="text-gray-600 text-sm">
-                            Kemajuan anda **disimpan secara automatik** dan dipaparkan dalam carta yang jelas. Muat turun Laporan Jurang Halal (PDF) yang komprehensif, sedia untuk dikongsi dengan perunding atau dijadikan rujukan utama dalam fail pematuhan syarikat anda.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Section 3: Target Audience & Manfaat Langsung -->
-        <section id="target" class="py-16 sm:py-24">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-12 items-center">
-                    
-                    <div class="lg:col-span-1">
-                        <h3 class="text-3xl font-extrabold text-gray-900 mb-4">Siapa yang Perlu Menggunakan eHalalGAP?</h3>
-                        <p class="text-lg text-gray-600">
-                            Sistem ini direka khas untuk memudahkan perjalanan **Pensijilan Halal JAKIM** bagi semua entiti.
-                        </p>
-                    </div>
-
-                    <div class="lg:col-span-2 space-y-6">
-                        <div class="bg-white p-6 rounded-xl shadow-xl border-l-4 border-yellow-500">
-                            <h4 class="text-xl font-bold text-gray-800 mb-2">Usahawan PKS Makanan & Minuman</h4>
-                            <p class="text-gray-600">
-                                Dapatkan gambaran segera tentang kelemahan dalam Premis, Bahan Mentah, dan Dokumentasi anda, menjimatkan masa dan mengurangkan kos persediaan audit.
-                            </p>
-                        </div>
-                        <div class="bg-white p-6 rounded-xl shadow-xl border-l-4 border-yellow-500">
-                            <h4 class="text-xl font-bold text-gray-800 mb-2">Pengeluar Kontrak (OEM) & Kosmetik</h4>
-                            <p class="text-gray-600">
-                                Penuhi keperluan pelanggan dengan cepat. Analisis GAP yang terperinci memastikan rantaian bekalan dan sanitasi anda mematuhi piawaian tertinggi.
-                            </p>
-                        </div>
-                        <div class="bg-white p-6 rounded-xl shadow-xl border-l-4 border-yellow-500">
-                            <h4 class="text-xl font-bold text-gray-800 mb-2">Perunding & Juru Audit Halal</h4>
-                            <p class="text-gray-600">
-                                Akses dashboard Konsultan untuk melihat kemajuan klien secara *real-time*, menjimatkan masa sesi konsultasi awal dan terus fokus pada penyelesaian masalah kritikal.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Section 4: Call to Action -->
-        <section class="hero-bg py-16">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-white">
-                <h2 class="text-3xl font-extrabold mb-4">Sedia untuk Menceburi Pasaran Halal?</h2>
-                <p class="text-xl font-light mb-8">
+        <!-- Section: Call to Action -->
+        <section class="bg-white py-16">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                <h2 class="text-3xl font-extrabold mb-4 text-gray-900">Sedia untuk Menceburi Pasaran Halal?</h2>
+                <p class="text-xl text-gray-600 mb-8">
                     Mulakan semakan GAP anda sekarang dan ketahui langkah tepat anda yang seterusnya.
                 </p>
                 <!-- Pautan Klien ke client.html (Dashboard Klien) -->
                 <a href="client.html" class="btn-primary px-8 py-4 rounded-xl text-lg shadow-xl uppercase">
-                    Mulakan Penilaian Kendiri &rarr;
+                    Mulakan Analisis eHalal<span class="text-teal-800">GAP</span> &rarr;
                 </a>
             </div>
         </section>
 
-        <!-- Section 5: Hubungi Kami (Contact) -->
-        <section id="contact" class="py-16 sm:py-24 bg-white">
+        <!-- Section: Hubungi Kami (Contact) -->
+        <section id="contact" class="py-16 sm:py-24 bg-gray-50">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="text-center mb-12">
                     <h2 class="text-4xl font-extrabold text-gray-900 mb-4">Hubungi Kami: Pasukan eHalalGAP</h2>
@@ -256,23 +129,23 @@
                     </p>
                 </div>
                 
-                <div class="max-w-2xl mx-auto bg-gray-50 p-8 rounded-xl shadow-2xl border-t-4 border-teal-600">
+                <div class="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-2xl border-t-4 border-teal-600">
                     <h3 class="text-2xl font-bold text-gray-800 mb-4">UniKL MICET Team Halal</h3>
                     <p class="text-gray-600 mb-6">
                         Jika anda mempunyai pertanyaan tentang sistem, kerjasama akademik, atau perkhidmatan konsultasi Halal, sila hubungi pasukan kami.
                     </p>
                     <div class="space-y-4">
-                        <p class="flex items-center text-gray-700">
-                            <svg class="w-6 h-6 mr-3 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26c.71.47 1.4.74 2.11.74s1.4-.27 2.11-.74L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-                            **E-mel:** [Maklumat Emel UniKL MICET]
+                        <p class="flex items-start text-gray-700">
+                            <svg class="w-6 h-6 mr-3 text-teal-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26c.71.47 1.4.74 2.11.74s1.4-.27 2.11-.74L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                            <span><strong>E-mel:</strong> nurmazni@unikl.edu.my</span>
                         </p>
-                        <p class="flex items-center text-gray-700">
-                            <svg class="w-6 h-6 mr-3 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.074 1.038a11.05 11.05 0 006.10 6.10l1.038-2.074a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.7 21 3 14.3 3 6V5z"></path></svg>
-                            **Telefon:** [Maklumat Nombor Telefon UniKL MICET]
+                        <p class="flex items-start text-gray-700">
+                            <svg class="w-6 h-6 mr-3 text-teal-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.074 1.038a11.05 11.05 0 006.10 6.10l1.038-2.074a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.7 21 3 14.3 3 6V5z"></path></svg>
+                            <span><strong>Telefon:</strong> 06-5512181</span>
                         </p>
-                        <p class="flex items-center text-gray-700">
-                            <svg class="w-6 h-6 mr-3 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                            **Alamat:** Universiti Kuala Lumpur, Kampus MICET.
+                        <p class="flex items-start text-gray-700">
+                            <svg class="w-6 h-6 mr-3 text-teal-600 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            <span><strong>Alamat:</strong> ACE UniKL MICET, Lot 1988, Bandar Vebdor, Taboh Naning, 78000 Alor Gajah, Melaka.</span>
                         </p>
                     </div>
                 </div>
@@ -284,7 +157,7 @@
     <!-- Footer Section (Consistent with other files) -->
     <footer class="bg-gray-800 text-white p-4 mt-8">
         <div class="max-w-7xl mx-auto text-center text-sm">
-            <p>&copy; Hak Cipta Ace UniKL MICET 2025. Semua Hak Cipta Terpelihara.</p>
+            <p>&copy; Hak Cipta ACE UniKL MICET 2025. Semua Hak Cipta Terpelihara.</p>
         </div>
     </footer>
 
