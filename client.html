@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Semakan Jurang Halal (eHalalGAP)</title>
+    <!-- Favicon Links -->
+    <link rel="apple-touch-icon" sizes="180x180" href="https://raw.githubusercontent.com/goldigger79/eHalalGAP/main/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="https://raw.githubusercontent.com/goldigger79/eHalalGAP/main/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="https://raw.githubusercontent.com/goldigger79/eHalalGAP/main/favicon-16x16.png">
+    <link rel="manifest" href="https://raw.githubusercontent.com/goldigger79/eHalalGAP/main/site.webmanifest">
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load Chart.js for visualization -->
@@ -127,8 +132,8 @@
                 max-width: 100%;
                 border-radius: 0;
             }
-            .sticky {
-                display: none;
+            .sticky, .print-hidden {
+                display: none !important;
             }
         }
     </style>
@@ -291,13 +296,16 @@
             const password = document.getElementById('password').value;
             const errorMessageElement = document.getElementById('auth-error-message');
             errorMessageElement.textContent = '';
+            errorMessageElement.classList.remove('p-3', 'bg-red-100', 'border', 'border-red-400', 'rounded-lg');
 
             if (!email || !password) {
                 errorMessageElement.textContent = "Sila masukkan emel dan kata laluan.";
+                errorMessageElement.classList.add('p-3', 'bg-red-100', 'border', 'border-red-400', 'rounded-lg');
                 return;
             }
             if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
                 errorMessageElement.textContent = "Sila masukkan format emel yang sah.";
+                 errorMessageElement.classList.add('p-3', 'bg-red-100', 'border', 'border-red-400', 'rounded-lg');
                 return;
             }
 
@@ -313,7 +321,7 @@
                 if (error.code === 'auth/operation-not-allowed') {
                     displayMessage = "Ralat Konfigurasi: Log Masuk Emel/Kata Laluan belum diaktifkan.";
                 } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-                    displayMessage = "Emel atau kata laluan tidak sah.";
+                    displayMessage = "Emel atau kata laluan tidak sah. Sila semak semula.";
                 } else if (error.code === 'auth/email-already-in-use') {
                     displayMessage = "Emel ini sudah berdaftar. Sila Log Masuk.";
                     window.updateState({ isRegisterMode: false });
@@ -324,6 +332,7 @@
                     displayMessage = "Kata laluan terlalu lemah (minimum 6 aksara).";
                 }
                 errorMessageElement.textContent = displayMessage;
+                errorMessageElement.classList.add('p-3', 'bg-red-100', 'border', 'border-red-400', 'rounded-lg');
             }
         };
 
@@ -766,7 +775,7 @@
                     tabClasses += ` cursor-pointer ${index === currentStepIndex ? 'tab-active bg-teal-50' : 'text-gray-600 hover:bg-gray-100'}`;
                 }
                 return `<button onclick="window.goToStep(${index})" class="${tabClasses}">${step.title.replace(/^\d+\.\s*/, '')}</button>`;
-            }).join('')}</nav><div class="p-6 bg-white rounded-xl shadow-2xl border-t-4 border-teal-500">${window.renderTabContent()}</div><div class="mt-8 flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0"><button onclick="window.changeStep(-1)" ${currentStepIndex === 0 ? 'disabled' : ''} class="w-full sm:w-auto btn-secondary px-6 py-3 rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>Sebelumnya</button><div class="flex flex-col items-center space-y-2 w-full sm:w-auto"><button onclick="window.manualSave()" ${isResultStep ? 'disabled' : ''} id="save-progress-btn" class="w-full sm:w-auto inline-flex items-center justify-center btn-secondary px-6 py-3 rounded-xl font-semibold hover:bg-teal-100 text-teal-700 disabled:opacity-50"><svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>Simpan Kemajuan</button><p id="save-status-message" class="text-xs text-gray-500 opacity-0 transition"></p></div><button onclick="window.changeStep(1)" ${isResultStep ? 'disabled' : ''} class="w-full sm:w-auto btn-primary px-6 py-3 rounded-xl text-white font-semibold disabled:opacity-50 flex items-center justify-center">${nextButtonText}<svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></button></div></div></main><footer class="bg-gray-800 text-white p-4 mt-8"><div class="max-w-6xl mx-auto text-center text-sm"><p>&copy; Hak Cipta ACE UniKL MICET 2025.</p></div></footer></div><div id="report-modal" class="modal"><div class="modal-content"><div class="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-xl z-10 print:hidden"><h2 class="text-2xl font-bold">Preview Laporan Penuh</h2><button onclick="window.toggleModal(false)" class="text-gray-500 hover:text-gray-800"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button></div><div id="modal-report-body"></div><div class="sticky bottom-0 bg-gray-50 border-t p-4 flex justify-center rounded-b-xl z-10 space-x-4 print:hidden"><button onclick="window.toggleModal(false)" class="btn-secondary px-6 py-3 rounded-xl font-semibold">Tutup</button><button onclick="window.printReport()" class="btn-primary px-6 py-3 rounded-xl text-white font-semibold">Cetak Laporan</button></div></div></div>`;
+            }).join('')}</nav><div class="p-6 bg-white rounded-xl shadow-2xl border-t-4 border-teal-500">${window.renderTabContent()}</div><div class="mt-8 flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0"><button onclick="window.changeStep(-1)" ${currentStepIndex === 0 ? 'disabled' : ''} class="w-full sm:w-auto btn-secondary px-6 py-3 rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>Sebelumnya</button><div class="flex flex-col items-center space-y-2 w-full sm:w-auto"><button onclick="window.manualSave()" ${isResultStep ? 'disabled' : ''} id="save-progress-btn" class="w-full sm:w-auto inline-flex items-center justify-center btn-secondary px-6 py-3 rounded-xl font-semibold hover:bg-teal-100 text-teal-700 disabled:opacity-50"><svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>Simpan Kemajuan</button><p id="save-status-message" class="text-xs text-gray-500 opacity-0 transition"></p></div><button onclick="window.changeStep(1)" ${isResultStep ? 'disabled' : ''} class="w-full sm:w-auto btn-primary px-6 py-3 rounded-xl text-white font-semibold disabled:opacity-50 flex items-center justify-center">${nextButtonText}<svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></button></div></div></main><footer class="bg-gray-800 text-white p-4 mt-8"><div class="max-w-6xl mx-auto text-center text-sm"><p>&copy; Hak Cipta ACE UniKL MICET 2025.</p></div></footer></div><div id="report-modal" class="modal"><div class="modal-content"><div class="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-xl z-10 print-hidden"><h2 class="text-2xl font-bold">Preview Laporan Penuh</h2><button onclick="window.toggleModal(false)" class="text-gray-500 hover:text-gray-800"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button></div><div id="modal-report-body"></div><div class="sticky bottom-0 bg-gray-50 border-t p-4 flex justify-center rounded-b-xl z-10 space-x-4 print-hidden"><button onclick="window.toggleModal(false)" class="btn-secondary px-6 py-3 rounded-xl font-semibold">Tutup</button><button onclick="window.printReport()" class="btn-primary px-6 py-3 rounded-xl text-white font-semibold">Cetak Laporan</button></div></div></div>`;
         };
     </script>
 </head>
