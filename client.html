@@ -6,8 +6,6 @@
     <title>Semakan Jurang Halal (eHalalGAP)</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load html2pdf.js for PDF generation -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <!-- Load Chart.js for visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
@@ -99,6 +97,39 @@
             max-height: 95vh;
             overflow-y: auto;
             position: relative;
+        }
+
+        /* Print-specific styles */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #modal-report-body, #modal-report-body * {
+                visibility: visible;
+            }
+            #report-modal {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: auto;
+                overflow: visible;
+                display: block !important;
+                background-color: white;
+                padding: 0;
+            }
+            .modal-content {
+                box-shadow: none;
+                border: none;
+                padding: 0;
+                margin: 0;
+                width: 100%;
+                max-width: 100%;
+                border-radius: 0;
+            }
+            .sticky {
+                display: none;
+            }
         }
     </style>
     <!-- Firebase SDKs -->
@@ -520,52 +551,8 @@
             }
         };
 
-        window.handlePaymentGate = () => {
-            // Direct download for beta testing
-            window.downloadPDF();
-        };
-
-        window.downloadPDF = () => {
-            const downloadButton = document.querySelector('#report-modal .btn-primary');
-            const originalButtonText = downloadButton.innerHTML;
-            downloadButton.innerHTML = 'Menjana PDF...';
-            downloadButton.disabled = true;
-
-            const element = document.createElement('div');
-            element.style.position = 'absolute';
-            element.style.left = '-9999px';
-            element.style.width = '1200px'; 
-            element.innerHTML = window.renderReportContent();
-            document.body.appendChild(element);
-
-            const generateThePDF = () => {
-                const clientIdentifier = window.appState.answers.nama_perniagaan || window.auth.currentUser.email || 'Klien';
-                const filename = `Laporan_eHalalGAP_${clientIdentifier.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
-                const opt = { margin: 1, filename, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
-                
-                html2pdf().set(opt).from(element).save().then(() => {
-                    document.body.removeChild(element);
-                    downloadButton.innerHTML = originalButtonText;
-                    downloadButton.disabled = false;
-                }).catch(err => {
-                    console.error("PDF generation failed:", err);
-                    document.body.removeChild(element);
-                    downloadButton.innerHTML = originalButtonText;
-                    downloadButton.disabled = false;
-                    alert("Gagal menjana PDF. Sila cuba lagi.");
-                });
-            };
-
-            const chartCanvas = element.querySelector('#modalReportPieChart');
-            const score = window.calculateScore();
-
-            if (score.totalAnswered > 0 && chartCanvas) {
-                // Render the chart and pass the PDF generation function as a callback
-                window.renderPieChart(score.answerBreakdown, chartCanvas, generateThePDF);
-            } else {
-                // If there's no chart, generate the PDF immediately
-                generateThePDF();
-            }
+        window.printReport = () => {
+            window.print();
         };
 
         window.renderLogin = () => {
@@ -779,7 +766,7 @@
                     tabClasses += ` cursor-pointer ${index === currentStepIndex ? 'tab-active bg-teal-50' : 'text-gray-600 hover:bg-gray-100'}`;
                 }
                 return `<button onclick="window.goToStep(${index})" class="${tabClasses}">${step.title.replace(/^\d+\.\s*/, '')}</button>`;
-            }).join('')}</nav><div class="p-6 bg-white rounded-xl shadow-2xl border-t-4 border-teal-500">${window.renderTabContent()}</div><div class="mt-8 flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0"><button onclick="window.changeStep(-1)" ${currentStepIndex === 0 ? 'disabled' : ''} class="w-full sm:w-auto btn-secondary px-6 py-3 rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>Sebelumnya</button><div class="flex flex-col items-center space-y-2 w-full sm:w-auto"><button onclick="window.manualSave()" ${isResultStep ? 'disabled' : ''} id="save-progress-btn" class="w-full sm:w-auto inline-flex items-center justify-center btn-secondary px-6 py-3 rounded-xl font-semibold hover:bg-teal-100 text-teal-700 disabled:opacity-50"><svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>Simpan Kemajuan</button><p id="save-status-message" class="text-xs text-gray-500 opacity-0 transition"></p></div><button onclick="window.changeStep(1)" ${isResultStep ? 'disabled' : ''} class="w-full sm:w-auto btn-primary px-6 py-3 rounded-xl text-white font-semibold disabled:opacity-50 flex items-center justify-center">${nextButtonText}<svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></button></div></div></main><footer class="bg-gray-800 text-white p-4 mt-8"><div class="max-w-6xl mx-auto text-center text-sm"><p>&copy; Hak Cipta ACE UniKL MICET 2025.</p></div></footer></div><div id="report-modal" class="modal"><div class="modal-content"><div class="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-xl z-10"><h2 class="text-2xl font-bold">Preview Laporan Penuh</h2><button onclick="window.toggleModal(false)" class="text-gray-500 hover:text-gray-800"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button></div><div id="modal-report-body"></div><div class="sticky bottom-0 bg-gray-50 border-t p-4 flex justify-center rounded-b-xl z-10 space-x-4"><button onclick="window.toggleModal(false)" class="btn-secondary px-6 py-3 rounded-xl font-semibold">Tutup</button><button onclick="window.handlePaymentGate()" class="btn-primary px-6 py-3 rounded-xl text-white font-semibold">Muat Turun PDF</button></div></div></div>`;
+            }).join('')}</nav><div class="p-6 bg-white rounded-xl shadow-2xl border-t-4 border-teal-500">${window.renderTabContent()}</div><div class="mt-8 flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0"><button onclick="window.changeStep(-1)" ${currentStepIndex === 0 ? 'disabled' : ''} class="w-full sm:w-auto btn-secondary px-6 py-3 rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>Sebelumnya</button><div class="flex flex-col items-center space-y-2 w-full sm:w-auto"><button onclick="window.manualSave()" ${isResultStep ? 'disabled' : ''} id="save-progress-btn" class="w-full sm:w-auto inline-flex items-center justify-center btn-secondary px-6 py-3 rounded-xl font-semibold hover:bg-teal-100 text-teal-700 disabled:opacity-50"><svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>Simpan Kemajuan</button><p id="save-status-message" class="text-xs text-gray-500 opacity-0 transition"></p></div><button onclick="window.changeStep(1)" ${isResultStep ? 'disabled' : ''} class="w-full sm:w-auto btn-primary px-6 py-3 rounded-xl text-white font-semibold disabled:opacity-50 flex items-center justify-center">${nextButtonText}<svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></button></div></div></main><footer class="bg-gray-800 text-white p-4 mt-8"><div class="max-w-6xl mx-auto text-center text-sm"><p>&copy; Hak Cipta ACE UniKL MICET 2025.</p></div></footer></div><div id="report-modal" class="modal"><div class="modal-content"><div class="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-xl z-10 print:hidden"><h2 class="text-2xl font-bold">Preview Laporan Penuh</h2><button onclick="window.toggleModal(false)" class="text-gray-500 hover:text-gray-800"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button></div><div id="modal-report-body"></div><div class="sticky bottom-0 bg-gray-50 border-t p-4 flex justify-center rounded-b-xl z-10 space-x-4 print:hidden"><button onclick="window.toggleModal(false)" class="btn-secondary px-6 py-3 rounded-xl font-semibold">Tutup</button><button onclick="window.printReport()" class="btn-primary px-6 py-3 rounded-xl text-white font-semibold">Cetak Laporan</button></div></div></div>`;
         };
     </script>
 </head>

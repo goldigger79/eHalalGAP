@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Log Masuk Konsultan - eHalalGAP</title>
+    <!-- Favicon Links -->
+    <link rel="apple-touch-icon" sizes="180x180" href="https://raw.githubusercontent.com/goldigger79/eHalalGAP/main/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="https://raw.githubusercontent.com/goldigger79/eHalalGAP/main/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="https://raw.githubusercontent.com/goldigger79/eHalalGAP/main/favicon-16x16.png">
+    <link rel="manifest" href="https://raw.githubusercontent.com/goldigger79/eHalalGAP/main/site.webmanifest">
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Load html2pdf.js for PDF generation -->
@@ -44,8 +49,8 @@
 
         // --- ALL QUESTIONNAIRE AND SCORING DATA (Copied from client.html) ---
         const flowSteps = [
-             { id: 'maklumat', title: '1. Maklumat Syarikat', type: 'form'},
-             { id: 'syarat', title: '2. Syarat Kelayakan', type: 'checklist', questions: ["Adakah syarikat berdaftar dengan Suruhanjaya Syarikat Malaysia (SSM)?","Adakah syarikat Telah beroperasi sepenuhnya sekurang-kurangnya 3 bulan?","Adakah syarikat Memiliki lesen atau kelulusan daripada PBT?","Jika premis makanan, adakah telah mendapat perakuan FOSIM? *","Jika skim kosmetik, adakah telah mendapat perakuan NPRA? *",]},
+             { id: 'maklumat', title: '1. Maklumat Perniagaan', type: 'form'},
+             { id: 'syarat', title: '2. Syarat Kelayakan', type: 'checklist', questions: ["Adakah perniagaan berdaftar dengan Suruhanjaya Perniagaan Malaysia (SSM)?","Adakah perniagaan Telah beroperasi sepenuhnya sekurang-kurangnya 3 bulan?","Adakah perniagaan Memiliki lesen atau kelulusan daripada PBT?","Jika premis makanan, adakah telah mendapat perakuan FOSIM? *","Jika skim kosmetik, adakah telah mendapat perakuan NPRA? *",]},
              { id: 'kategori', title: '3. Kategori Industri', type: 'selection', options: ['Mikro', 'Kecil', 'Sederhana', 'Besar']},
              { id: 'skim', title: '4. Skim Pensijilan', type: 'selection', options: ['Produk Makanan dan Minuman', 'Produk Kosmetik', 'Produk Farmaseutikal', 'Premis Makanan', 'Produk Barang Gunaan', 'Perkhidmatan Logistik', 'Rumah Sembelihan', 'Pengilangan Kontrak/OEM', 'Produk Peranti Perubatan']},
              { id: 'premis', title: '5. Premis', type: 'qa'},
@@ -57,11 +62,11 @@
              { id: 'result', title: '11. Keputusan & Laporan', type: 'result'}
         ];
         const qaQuestions = {
-            premis: ["Adakah premis anda terletak jauh dari dan tidak dicemari oleh ladang babi atau aktiviti pemprosesan tidak halal?", "Adakah premis bebas daripada bahan mentah dan produk tidak halal seperti arak dan daging babi?", "Adakah premis mempunyai mekanisme pengawalan bagi mencegah haiwan peliharaan atau liar, serangga dan haiwan perosak daripada memasuki atau berada di dalam kawasan premis?", "Adakah premis dalam keadaan baik, bersih dan kemas?", "Adakah lantai, dinding, siling, kipas, penghawa dingin, tingkap dan pintu berkeadaan bersih dan tidak menyumbang kepada pencemaran?", "Adakah bekalan air terawat dari Jabatan Bekalan Air (potable water) mencukupi dan dilindungi daripada pencemaran?", "Adakah ruang simpanan bahan mentah dipisahkan daripada ruang simpanan produk siap?", "Adakah terdapat kemudahan sinki untuk basuh tangan yang dilengkapi dengan sabun dan tuala pakai buang/pengering tangan?", "Adakah lantai diperbuat daripada bahan kalis air, tidak menyerap dan mudah dibersihkan?", "Adakah terdapat sistem saliran air yang baik pada lantai pemprosesan?", "Adakah dinding premis licin, kalis air, dan mudah dicuci?", "Adakah siling atau bahagian atas premis direka untuk elak habuk jatuh, kulapuk dan titisan air?", "Adakah pintu premis diperbuat daripada bahan kalis air, mudah dibersihkan, dan ditutup secara kendiri?", "Adakah tingkap yang boleh dibuka dilengkapi dengan jaring/mosquito net untuk elak serangga masuk?", "Adakah pencahayaan di kawasan pemprosesan mencukupi dan tidak menyebabkan risiko pencemaran makanan?", "Adakah lampu yang berpenutup digunakan di kawasan pemprosesan?", "Adakah sistem pengudaraan premis berfungsi baik dan aliran udara bergerak dari kawasan bersih ke kawasan kurang bersih (bukan sebaliknya)?", "Adakah bilik air/tandas disediakan dalam jumlah mencukupi?", "Adakah bilik air/tandas tidak terus bersambung dengan ruang pemprosesan makanan?", "Adakah premis mempunyai stor yang berasingan untuk Bahan mentah?", "Adakah premis mempunyai stor yang berasingan untuk Produk siap?", "Adakah premis mempunyai stor yang berasingan untuk Bahan kimia/pembersihan?", "Adakah premis menyediakan ruang solat kepada pekerja muslim?", "Adakah premis menyediakan ruang persalinan kepada pekerja?", "Adakah premis menyediakan ruang makan atau rehat kepada pekerja?", "Adakah premis menyediakan kemudahan penyimpanan barang peribadi kepada pekerja?", "Adakah premis memastikan alat dan unsur penyembahan tidak berada dalam kawasan pemprosesan?", "Adakah premis memastikan tempat tinggal pekerja tidak berada dalam kawasan pemprosesan?", "Adakah aliran proses pengeluaran makanan dalam premis satu arah (linear flow)?", "Adakah terdapat pemisahan kawasan bersih dan kawasan kotor untuk mengelakkan pencemaran?"],
+            premis: ["Adakah premis anda terletak jauh dari dan tidak dicemari oleh ladang babi atau aktiviti pemprosesan tidak halal?", "Adakah premis bebas daripada bahan mentah dan produk tidak halal seperti arak dan daging babi?", "Adakah premis mempunyai mekanisme pengawalan bagi mencegah haiwan peliharaan atau liar, serangga dan haiwan perosak daripada memasuki atau berada di dalam kawasan premis?", "Adakah premis dalam keadaan baik, bersih dan kemas?", "Adakah lantai, dinding, siling, kipas, penghawa dingin, tingkap dan pintu berkeadaan bersih dan tidak menyumbang kepada pencemaran?", "Adakah bekalan air terawat dari Jabatan Bekalan Air (potable water) mencukupi dan dilindungi daripada pencemaran?", "Adakah ruang simpanan bahan mentah dipisahkan daripada ruang simpanan produk siap?", "Adakah terdapat kemudahan sinki untuk basuh tangan yang dilengkapi dengan sabun dan tuala pakai buang/pengering tangan?", "Adakah lantai diperbuat daripada bahan kalis air, tidak menyerap dan mudah dibersihkan?", "Adakah terdapat sistem saliran air yang baik pada lantai pemprosesan?", "Adakah dinding premis licin, kalis air, dan mudah dicuci?", "Adakah siling atau bahagian atas premis direka untuk elak habuk jatuh, kulapuk dan titisan air?", "Adakah pintu premis diperbuat daripada bahan kalis air, mudah dibersihkan, dan ditutup secara kendiri?", "Adakah tingkap yang boleh dibuka dilengkapi dengan jaring/mosquito net untuk elak serangga masuk?","Adakah pencahayaan di kawasan pemprosesan mencukupi dan tidak menyebabkan risiko pencemaran makanan?","Adakah lampu yang berpenutup digunakan di kawasan pemprosesan?","Adakah sistem pengudaraan premis berfungsi baik dan aliran udara bergerak dari kawasan bersih ke kawasan kurang bersih (bukan sebaliknya)?","Adakah bilik air/tandas disediakan dalam jumlah mencukupi?","Adakah bilik air/tandas tidak terus bersambung dengan ruang pemprosesan makanan?","Adakah premis mempunyai stor yang berasingan untuk Bahan mentah?","Adakah premis mempunyai stor yang berasingan untuk Produk siap?","Adakah premis mempunyai stor yang berasingan untuk Bahan kimia/pembersihan?","Adakah premis menyediakan ruang solat kepada pekerja muslim?","Adakah premis menyediakan ruang persalinan kepada pekerja?","Adakah premis menyediakan ruang makan atau rehat kepada pekerja?","Adakah premis menyediakan kemudahan penyimpanan barang peribadi kepada pekerja?","Adakah premis memastikan alat dan unsur penyembahan tidak berada dalam kawasan pemprosesan?","Adakah premis memastikan tempat tinggal pekerja tidak berada dalam kawasan pemprosesan?","Adakah aliran proses pengeluaran makanan dalam premis satu arah (linear flow)?","Adakah terdapat pemisahan kawasan bersih dan kawasan kotor untuk mengelakkan pencemaran?"],
             bahan: ["Adakah semua bahan mentah (termasuk bahan tambahan & bahan pembungkusan primer) mempunyai sijil halal yang sah?","Jika bahan mentah diimport, adakah ia daripada badan pensijilan halal luar negara yang diiktiraf JAKIM?","Adakah rekod pembelian bahan mentah (invois, delivery order) disimpan dan boleh diaudit?","Adakah terdapat sebarang bahan mentah daripada sumber syubhah/diragui?","Adakah bahan mentah halal disimpan berasingan daripada bahan tidak halal/diragui?","Adakah stor bahan mentah dilabel dengan jelas untuk elak kekeliruan (contoh: 'Halal Certified', 'Non-halal', 'Bahan Kimia')?"],
             sanitasi: ["Adakah terdapat sink untuk basuh tangan yang dilengkapi sabun, tisu/pengering automatik, dan air bersih?","Adakah terdapat jadual pembersihan dan sanitasi bertulis yang disediakan dan disemak?","Adakah tong sampah bertutup dan mudah dibersihkan digunakan dalam premis?","Adakah bilik air/tandas Bersih, tidak berbau dan tidak terbuka secara langsung kepada kawasan pemprosesan?","Adakah terdapat sistem kawalan makhluk perosak?"],
-            pekerja: ["Adakah syarikat mempunyai pekerja muslim warganegara?","Adakah pekerja syarikat telah menerima latihan halal?"],
-            dokumentasi: ["Adakah dokumen dan rekod disimpan dengan baik, dikemaskini dan mudah untuk dirujuk?","Adakah syarikat menyimpan rekod pembelian bahan mentah bersama sijil halal pembekal?"]
+            pekerja: ["Adakah perniagaan mempunyai pekerja muslim warganegara?","Adakah pekerja perniagaan telah menerima latihan halal?"],
+            dokumentasi: ["Adakah dokumen dan rekod disimpan dengan baik, dikemaskini dan mudah untuk dirujuk?","Adakah perniagaan menyimpan rekod pembelian bahan mentah bersama sijil halal pembekal?"]
         };
         const questionPoints = {
             'syarat': [7, 7, 7, 7, 7], 
@@ -86,8 +91,8 @@
             else if (progress >= 60) { status = 'Kurang Bersedia'; } 
             else { status = 'Tidak Bersedia'; }
 
-            let promptData = `Analisis Kesediaan Pensijilan Halal (eHalalGAP) Syarikat:\n\n`;
-            promptData += `STATUS KESELURUHAN: ${status} (${progress.toFixed(0)}% Skor Kesediaan | ${pointsScored} dari ${totalMaxPoints} mata)\n`;
+            let promptData = `Analisis Ketersediaan Pensijilan Halal (eHalalGAP) Perniagaan:\n\n`;
+            promptData += `STATUS KESELURUHAN: ${status} (${progress.toFixed(0)}% Skor Ketersediaan | ${pointsScored} dari ${totalMaxPoints} mata)\n`;
             promptData += `Jumlah Soalan Dijawab: ${breakdown.ya + breakdown.tidak}, Dijawab YA: ${breakdown.ya}, TIDAK: ${breakdown.tidak}.\n\n`;
             promptData += `Analisis Bahagian (Berdasarkan Mata Berwajaran):\n`;
 
@@ -112,7 +117,7 @@
             });
             
             const systemPrompt = `Anda adalah Juruanalisis Pematuhan Halal. Berdasarkan data berikut, hasilkan ringkasan profesional dalam Bahasa Melayu. Ringkasan perlu merangkumi: 1. Status keseluruhan & skor. 2. Bahagian terkuat (>80%). 3. Bahagian paling lemah (memerlukan perhatian). 4. 1-2 nasihat kritikal. Format dalam satu perenggan padat, tanpa tajuk.`;
-            const userQuery = `Sila analisis data penilaian kesediaan Halal berikut:\n${promptData}`;
+            const userQuery = `Sila analisis data penilaian ketersediaan Halal berikut:\n${promptData}`;
             const apiKey = ""; 
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
             const payload = { contents: [{ parts: [{ text: userQuery }] }], systemInstruction: { parts: [{ text: systemPrompt }] } };
@@ -223,9 +228,9 @@
             const progress = score.readinessScore;
             let status, statusColor, recommendation;
 
-            if (progress >= 80) { status = 'Bersedia'; statusColor = 'bg-green-100 text-green-700 border-green-500'; recommendation = 'Syarikat menunjukkan kesediaan tinggi.'; } 
-            else if (progress >= 60) { status = 'Kurang Bersedia'; statusColor = 'bg-yellow-100 text-yellow-700 border-yellow-500'; recommendation = 'Syarikat di tahap sederhana. Fokus pada jurang (GAP) yang dikenal pasti.'; } 
-            else { status = 'Tidak Bersedia'; statusColor = 'bg-red-100 text-red-700 border-red-500'; recommendation = 'Syarikat memerlukan penambahbaikan signifikan.'; }
+            if (progress >= 80) { status = 'Bersedia'; statusColor = 'bg-green-100 text-green-700 border-green-500'; recommendation = 'Perniagaan menunjukkan ketersediaan tinggi.'; } 
+            else if (progress >= 60) { status = 'Kurang Bersedia'; statusColor = 'bg-yellow-100 text-yellow-700 border-yellow-500'; recommendation = 'Perniagaan di tahap sederhana. Fokus pada jurang (GAP) yang dikenal pasti.'; } 
+            else { status = 'Tidak Bersedia'; statusColor = 'bg-red-100 text-red-700 border-red-500'; recommendation = 'Perniagaan memerlukan penambahbaikan signifikan.'; }
 
             const clientReview = answers['ulasan_cabaran_utama'];
             const scoredSections = ['syarat', 'premis', 'bahan', 'sanitasi', 'pekerja', 'dokumentasi'];
@@ -241,7 +246,7 @@
                     <div class="p-6 rounded-xl shadow-lg border border-gray-100">
                         <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Ringkasan Keputusan</h3>
                         <div class="flex flex-col sm:flex-row items-center justify-around text-center space-y-4 sm:space-y-0">
-                            <div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl text-gray-500 mt-1">Peratus Kesediaan</p></div>
+                            <div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl text-gray-500 mt-1">Peratus Ketersediaan</p></div>
                             <div><p class="text-5xl font-extrabold text-gray-800">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl text-gray-500 mt-1">Mata Halal Diperolehi</p></div>
                         </div>
                     </div>
@@ -257,9 +262,9 @@
                     </div>
                     
                      <div class="p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-200">
-                        <h4 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Maklumat Syarikat</h4>
+                        <h4 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Maklumat Perniagaan</h4>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
-                            ${['Nama Syarikat', 'No SSM (jika ada)', 'Alamat', 'No Telefon', 'Nama Pemilik', 'Jualan tahunan syarikat', 'Bilangan pekerja keseluruhan'].map(field => {
+                            ${['Nama Perniagaan', 'No SSM (jika ada)', 'Alamat', 'No Telefon', 'Nama Pemilik', 'Jualan tahunan perniagaan', 'Bilangan pekerja keseluruhan'].map(field => {
                                 const id = field.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_'); 
                                 return `<p><strong>${field}:</strong> ${answers[id] || '- Tidak diisi -'}</p>`;
                             }).join('')}
@@ -313,11 +318,11 @@
                         }).join('')}
                     </div>
 
-                    <div class="text-xs text-gray-500 text-center pt-4 border-t">Laporan ini dijana secara automatik. &copy; Hak Cipta Ace UniKL MICET 2025.</div>
+                    <div class="text-xs text-gray-500 text-center pt-4 border-t">Laporan ini dijana secara automatik. &copy; Hak Cipta ACE UniKL MICET 2025.</div>
                 </div>`;
         };
 
-        const downloadPDF = () => {
+        window.downloadPDF = () => {
             if (!selectedClientData) {
                 alert("Sila pilih klien dan jana laporan terlebih dahulu.");
                 return;
@@ -436,16 +441,14 @@
             db = getFirestore(app);
             auth = getAuth(app);
             
-            // List of authorized consultant UIDs
             const consultantUIDs = ["7XtS5IWBTpgKryjAvONtXALd8R03", "A2nVUfDEVkhQPyTf8tUkCoXmQeJ3"];
 
             onAuthStateChanged(auth, (user) => {
-                // Check if the logged-in user's UID is in the authorized list
                 if (user && consultantUIDs.includes(user.uid)) {
                     showDashboard();
                     loadClients();
                 } else {
-                    if(user) { signOut(auth); } // If a non-consultant is logged in, log them out
+                    if(user) { signOut(auth); }
                     showLogin();
                 }
             });
@@ -530,9 +533,9 @@
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="p-4 text-left text-xs font-medium text-gray-500 uppercase">Nama Syarikat</th>
+                                <th class="p-4 text-left text-xs font-medium text-gray-500 uppercase">Nama Perniagaan</th>
                                 <th class="p-4 text-left text-xs font-medium text-gray-500 uppercase">ID Klien</th>
-                                <th class="p-4 text-left text-xs font-medium text-gray-500 uppercase">Skor Kesediaan</th>
+                                <th class="p-4 text-left text-xs font-medium text-gray-500 uppercase">Skor Ketersediaan</th>
                                 <th class="p-4 text-left text-xs font-medium text-gray-500 uppercase">Terakhir Dikemaskini</th>
                                 <th class="p-4 text-left text-xs font-medium text-gray-500 uppercase">Tindakan</th>
                             </tr>
@@ -553,7 +556,7 @@
         <!-- Footer -->
         <footer class="bg-gray-800 text-white p-4">
             <div class="max-w-7xl mx-auto text-center text-sm">
-                <p>&copy; Hak Cipta Ace UniKL MICET 2025.</p>
+                <p>&copy; Hak Cipta ACE UniKL MICET 2025.</p>
             </div>
         </footer>
     </div>
