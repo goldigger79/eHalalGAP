@@ -11,8 +11,6 @@
     <link rel="manifest" href="https://raw.githubusercontent.com/goldigger79/eHalalGAP/main/site.webmanifest">
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load html2pdf.js for PDF generation -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <!-- Load Chart.js for visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
@@ -25,6 +23,47 @@
         .btn-secondary:hover { background-color: #d1d5db; }
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 50; overflow-y: auto; padding: 20px; }
         .modal-content { background-color: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 95%; max-width: 1200px; max-height: 95vh; overflow-y: auto; position: relative; }
+        
+        /* Print-specific styles */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #modal-report-body, #modal-report-body * {
+                visibility: visible;
+            }
+            #report-modal {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: auto;
+                overflow: visible;
+                display: block !important;
+                background-color: white;
+                padding: 0;
+            }
+            .modal-content {
+                box-shadow: none;
+                border: none;
+                padding: 0;
+                margin: 0;
+                width: 100%;
+                max-width: 100%;
+                border-radius: 0;
+            }
+            .print-hidden {
+                display: none !important;
+            }
+            .page-break {
+                page-break-before: always;
+                break-before: page;
+            }
+             @page {
+                size: A4;
+                margin: 2cm;
+            }
+        }
     </style>
     <!-- Firebase SDKs -->
     <script type="module">
@@ -159,22 +198,35 @@
             return { readinessScore, totalPointsScored, totalQuestions: MAX_TOTAL_POINTS, answerBreakdown: { ya: countYa, tidak: countTidak, notAnswered: totalScoredQuestions - totalAnswered } };
         };
 
-        const renderPieChart = (answerBreakdown, canvasId) => {
-             const ctx = document.getElementById(canvasId);
-            if (!ctx) return;
-            const existingChart = Chart.getChart(ctx);
-            if (existingChart) { existingChart.destroy(); }
-            new Chart(ctx, {
-                type: 'pie',
-                data: {
-                    labels: ['YA (Halal Ready)', 'TIDAK (Perlu Tindakan)', 'Belum Dijawab'],
-                    datasets: [{
-                        data: [answerBreakdown.ya, answerBreakdown.tidak, answerBreakdown.notAnswered],
-                        backgroundColor: ['#0d9488', '#dc2626', '#e5e7eb'],
-                        hoverOffset: 4
-                    }]
-                },
-                options: { responsive: true, plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Analisis Jawapan Keseluruhan' } } }
+        const renderPieChart = (answerBreakdown, canvasTarget, onCompleteCallback = null) => {
+            let canvasEl = typeof canvasTarget === 'string' ? document.getElementById(canvasTarget) : canvasTarget;
+
+            if (!canvasEl) {
+                if (onCompleteCallback) onCompleteCallback();
+                return null;
+            }
+            
+            const existingChart = Chart.getChart(canvasEl);
+            if (existingChart) {
+                existingChart.destroy();
+            }
+            
+            return new Chart(canvasEl, {
+                type: 'pie', data: { labels: ['YA (Halal Ready)', 'TIDAK (Perlu Tindakan)', 'Belum Dijawab'], datasets: [{ data: [answerBreakdown.ya, answerBreakdown.tidak, answerBreakdown.notAnswered], backgroundColor: ['#0d9488', '#dc2626', '#e5e7eb'], hoverOffset: 4 }] },
+                options: { 
+                    responsive: true, 
+                    animation: {
+                        onComplete: () => {
+                            if (onCompleteCallback) {
+                                onCompleteCallback();
+                            }
+                        }
+                    },
+                    plugins: { 
+                        legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 14 } } }, 
+                        title: { display: true, text: 'Analisis Jawapan Keseluruhan', font: { size: 18, family: 'Inter', weight: 'bold' } } 
+                    } 
+                }
             });
         };
         
@@ -243,56 +295,26 @@
                         <p class="text-sm text-gray-500">ID Klien: ${client.userId}</p>
                     </div>
 
-                    <div class="p-6 rounded-xl shadow-lg border border-gray-100">
-                        <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Ringkasan Keputusan</h3>
-                        <div class="flex flex-col sm:flex-row items-center justify-around text-center space-y-4 sm:space-y-0">
-                            <div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl text-gray-500 mt-1">Peratus Ketersediaan</p></div>
-                            <div><p class="text-5xl font-extrabold text-gray-800">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl text-gray-500 mt-1">Mata Halal Diperolehi</p></div>
-                        </div>
-                    </div>
+                    <div class="p-6 rounded-xl shadow-lg border border-gray-100 page-break"><h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Ringkasan Keputusan</h3><div class="flex flex-col sm:flex-row items-center justify-around text-center space-y-4 sm:space-y-0"><div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl text-gray-500 mt-1">Peratus Ketersediaan</p></div><div><p class="text-5xl font-extrabold text-gray-800">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl text-gray-500 mt-1">Mata Halal Diperolehi</p></div></div></div>
 
-                    <div class="text-center p-6 rounded-xl border-4 ${statusColor} shadow-md">
-                        <p class="text-2xl font-bold">Status: <span class="text-3xl">${status.toUpperCase()}</span></p>
-                        <p class="mt-4 text-md">${recommendation}</p>
-                    </div>
+                    <div class="text-center p-6 rounded-xl border-4 ${statusColor} shadow-md"><p class="text-2xl font-bold">Status: <span class="text-3xl">${status.toUpperCase()}</span></p><p class="mt-4 text-md">${recommendation}</p></div>
 
-                    <div class="p-6 bg-teal-50 rounded-xl shadow-lg border-l-4 border-teal-600">
-                        <h4 class="text-xl font-semibold text-gray-800 mb-3">Ringkasan Analisis AI Gemini</h4>
-                        <div id="ai-summary-content" class="text-gray-700 text-base italic"><p class="animate-pulse text-teal-600">AI sedang menganalisis data anda...</p></div>
-                    </div>
+                    <div class="p-6 bg-teal-50 rounded-xl shadow-lg border-l-4 border-teal-600 page-break"><h4 class="text-xl font-semibold mb-3">Ringkasan Analisis AI Gemini</h4><div id="ai-summary-content" class="text-gray-700 text-base italic"><p class="animate-pulse text-teal-600">AI sedang menganalisis data anda...</p></div></div>
                     
-                     <div class="p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-200">
-                        <h4 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Maklumat Perniagaan</h4>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
-                            ${['Nama Perniagaan', 'No SSM (jika ada)', 'Alamat', 'No Telefon', 'Nama Pemilik', 'Jualan tahunan perniagaan', 'Bilangan pekerja keseluruhan'].map(field => {
+                     <div class="p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-200 page-break"><h4 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Maklumat Perniagaan</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">${['Nama Perniagaan', 'No SSM (jika ada)', 'Alamat', 'No Telefon', 'Nama Pemilik', 'Jualan tahunan perniagaan', 'Bilangan pekerja keseluruhan'].map(field => {
                                 const id = field.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_'); 
                                 return `<p><strong>${field}:</strong> ${answers[id] || '- Tidak diisi -'}</p>`;
-                            }).join('')}
-                        </div>
-                    </div>
+                            }).join('')}</div></div>
 
                     ${clientReview ? `
-                        <div class="p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-200">
-                            <h4 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Ulasan Cabaran oleh Klien</h4>
-                            <p class="text-sm text-gray-700 whitespace-pre-wrap">${clientReview}</p>
-                        </div>` : ''
+                        <div class="p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-200 page-break"><h4 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Ulasan Cabaran oleh Klien</h4><p class="text-sm text-gray-700 whitespace-pre-wrap">${clientReview}</p></div>` : ''
                     }
 
-                    <div class="p-6 bg-white rounded-xl shadow-lg">
-                        <h4 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-2 text-center">Analisis Jawapan Keseluruhan</h4>
-                        <div class="flex justify-center w-full max-w-lg mx-auto">
-                            <canvas id="modalReportPieChart" width="400" height="400"></canvas>
-                        </div>
-                    </div>
+                    <div class="p-6 bg-white rounded-xl shadow-lg page-break"><h4 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-2 text-center">Analisis Jawapan Keseluruhan</h4><div class="flex justify-center w-full max-w-lg mx-auto"><canvas id="modalReportPieChart" width="400" height="400"></canvas></div></div>
                     
-                    <div class="p-6 bg-white rounded-xl shadow-lg border-t-4 border-red-500">
-                        <h4 class="text-xl font-bold text-red-700 mb-4 border-b pb-2">Jurang Pematuhan Kritikal</h4>
-                        ${renderGapsTable(answers, scoredSections)}
-                    </div>
+                    <div class="p-6 bg-white rounded-xl shadow-lg border-t-4 border-red-500 page-break"><h4 class="text-xl font-bold text-red-700 mb-4 border-b pb-2">Jurang Pematuhan Kritikal</h4>${renderGapsTable(answers, scoredSections)}</div>
 
-                    <div class="p-6 bg-white rounded-xl shadow-lg">
-                        <h4 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-2">Analisis Mengikut Bahagian</h4>
-                        ${scoredSections.map(sectionId => {
+                    <div class="p-6 bg-white rounded-xl shadow-lg page-break"><h4 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-2">Analisis Mengikut Bahagian</h4>${scoredSections.map(sectionId => {
                             const questions = (sectionId === 'syarat') ? flowSteps.find(s => s.id === 'syarat').questions : qaQuestions[sectionId];
                             const points = questionPoints[sectionId] || [];
                             let secMaxPoints = points.reduce((a, b) => a + b, 0);
@@ -315,41 +337,34 @@
                                     </div>
                                     <div class="w-full bg-gray-200 rounded-full h-3"><div class="${barColor} h-3 rounded-full" style="width: ${secPercentage.toFixed(0)}%"></div></div>
                                 </div>`;
-                        }).join('')}
-                    </div>
+                        }).join('')}</div>
 
-                    <div class="text-xs text-gray-500 text-center pt-4 border-t">Laporan ini dijana secara automatik. &copy; Hak Cipta ACE UniKL MICET 2025.</div>
+                    <div class="text-xs text-gray-500 text-center pt-4 border-t">&copy; Hak Cipta ACE UniKL MICET 2025.</div>
                 </div>`;
         };
 
-        window.downloadPDF = () => {
-            if (!selectedClientData) {
-                alert("Sila pilih klien dan jana laporan terlebih dahulu.");
-                return;
-            }
-            const { client, answers, score } = selectedClientData;
-            
-            // Re-render content specifically for PDF generation to ensure chart is included
-            const element = document.createElement('div');
-            element.innerHTML = renderReportContent(client, answers, score);
-            
-            // Append to body temporarily to render chart
-            document.body.appendChild(element);
-            const chartCanvas = element.querySelector('#modalReportPieChart');
-            renderPieChart(score.answerBreakdown, chartCanvas.id);
+        window.printReport = async () => {
+            const modalBody = document.getElementById('modal-report-body');
+            if (!modalBody) return alert("Tiada laporan untuk dicetak.");
 
-            const filename = `Laporan_eHalalGAP_${(client.clientName || 'Klien').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
-            const opt = { margin: 0.5, filename, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
+            // Ensure the report is fully rendered
+            modalBody.innerHTML = renderReportContent(selectedClientData.client, selectedClientData.answers, selectedClientData.score);
             
-            // Add a small delay for chart to render before generating PDF
-            setTimeout(() => {
-                html2pdf().set(opt).from(element).save().then(() => {
-                    document.body.removeChild(element); // Clean up the temporary element
+            // Render the chart first
+            const score = calculateScore(selectedClientData.answers);
+            if (score.totalAnswered > 0) {
+                await new Promise((resolve) => {
+                    renderPieChart(score.answerBreakdown, 'modalReportPieChart', resolve);
                 });
-            }, 500);
+            }
+
+            // Wait for the browser to paint the elements
+            await new Promise(r => setTimeout(r, 400));
+
+            // Now, call print
+            window.print();
         };
-        window.downloadPDF = downloadPDF;
-        
+
         window.viewReport = async (userId) => {
             const reportBody = document.getElementById('modal-report-body');
             reportBody.innerHTML = '<p class="text-center p-8">Memuatkan data klien...</p>';
@@ -564,14 +579,14 @@
     <!-- Report Preview Modal -->
     <div id="report-modal" class="modal">
         <div class="modal-content">
-            <div class="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-xl z-10">
+            <div class="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-xl z-10 print-hidden">
                 <h2 class="text-2xl font-bold text-gray-800">Laporan Penuh Klien</h2>
                 <button onclick="window.toggleModal(false)" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
             </div>
             <div id="modal-report-body"></div>
-            <div class="sticky bottom-0 bg-gray-50 border-t p-4 flex justify-center space-x-4 rounded-b-xl z-10">
+            <div class="sticky bottom-0 bg-gray-50 border-t p-4 flex justify-center space-x-4 rounded-b-xl z-10 print-hidden">
                 <button onclick="window.toggleModal(false)" class="btn-secondary px-6 py-2 rounded-xl">Tutup</button>
-                <button onclick="window.downloadPDF()" class="btn-primary text-white px-6 py-2 rounded-xl">Muat Turun PDF</button>
+                <button onclick="window.printReport()" class="btn-primary text-white px-6 py-2 rounded-xl">Cetak Laporan</button>
             </div>
         </div>
     </div>
