@@ -362,7 +362,7 @@
                             isReadyAnswer = (answer === 'TIDAK'); 
                         }
                         
-                        if (sectionId === 'syarat' && (index === 3 || index === 4)) {
+                        if ( (sectionId === 'syarat' && (index === 3 || index === 4)) || (sectionId === 'bahan' && index === 1) ) {
                             isReadyAnswer = (answer === 'YA' || answer === 'Tidak Berkenaan');
                         }
 
@@ -451,9 +451,7 @@
 
                     if (sectionId === 'bahan' && index === 3) { // Inverted GAP logic for 'bahan' question 4
                         isGap = (answer === 'YA');
-                    } else if (sectionId === 'syarat' && (index === 3 || index === 4)) { // Optional 'syarat' questions
-                        isGap = (answer === 'TIDAK');
-                    } else { // Default GAP logic
+                    } else { // Default GAP logic for 'TIDAK'
                         isGap = (answer === 'TIDAK');
                     }
 
@@ -466,13 +464,13 @@
             return `<div class="overflow-x-auto shadow-md rounded-lg"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bahagian</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Soalan Jurang (GAP)</th><th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Mata Hilang</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">${allGaps.map(gap => `<tr class="hover:bg-red-50/50"><td class="px-6 py-4 text-sm font-medium text-red-700">${gap.section}</td><td class="px-6 py-4 text-sm">${gap.question}</td><td class="px-6 py-4 text-center text-sm font-bold text-red-600">${gap.pointValue}</td></tr>`).join('')}</tbody></table></div>`;
         };
 
-        window.renderPieChart = (answerBreakdown, canvasTarget) => {
-            let canvasEl = canvasTarget;
-            if (typeof canvasTarget === 'string') {
-                canvasEl = document.getElementById(canvasTarget);
-            }
+        window.renderPieChart = (answerBreakdown, canvasTarget, onCompleteCallback = null) => {
+            let canvasEl = typeof canvasTarget === 'string' ? document.getElementById(canvasTarget) : canvasTarget;
 
-            if (!canvasEl) return;
+            if (!canvasEl) {
+                if (onCompleteCallback) onCompleteCallback();
+                return null;
+            }
             
             const existingChart = Chart.getChart(canvasEl);
             if (existingChart) {
@@ -481,7 +479,20 @@
             
             return new Chart(canvasEl, {
                 type: 'pie', data: { labels: ['YA (Halal Ready)', 'TIDAK (Perlu Tindakan)', 'Belum Dijawab'], datasets: [{ data: [answerBreakdown.ya, answerBreakdown.tidak, answerBreakdown.notAnswered], backgroundColor: ['#0d9488', '#dc2626', '#e5e7eb'], hoverOffset: 4 }] },
-                options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 14 } } }, title: { display: true, text: 'Analisis Jawapan Keseluruhan', font: { size: 18, family: 'Inter', weight: 'bold' } } } }
+                options: { 
+                    responsive: true, 
+                    animation: {
+                        onComplete: () => {
+                            if (onCompleteCallback) {
+                                onCompleteCallback();
+                            }
+                        }
+                    },
+                    plugins: { 
+                        legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 14 } } }, 
+                        title: { display: true, text: 'Analisis Jawapan Keseluruhan', font: { size: 18, family: 'Inter', weight: 'bold' } } 
+                    } 
+                }
             });
         };
 
@@ -515,29 +526,46 @@
         };
 
         window.downloadPDF = () => {
+            const downloadButton = document.querySelector('#report-modal .btn-primary');
+            const originalButtonText = downloadButton.innerHTML;
+            downloadButton.innerHTML = 'Menjana PDF...';
+            downloadButton.disabled = true;
+
             const element = document.createElement('div');
             element.style.position = 'absolute';
             element.style.left = '-9999px';
-            element.style.width = '1200px'; // Set a fixed width for consistent PDF rendering
+            element.style.width = '1200px'; 
             element.innerHTML = window.renderReportContent();
             document.body.appendChild(element);
+
+            const generateThePDF = () => {
+                const clientIdentifier = window.appState.answers.nama_perniagaan || window.auth.currentUser.email || 'Klien';
+                const filename = `Laporan_eHalalGAP_${clientIdentifier.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+                const opt = { margin: 1, filename, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
+                
+                html2pdf().set(opt).from(element).save().then(() => {
+                    document.body.removeChild(element);
+                    downloadButton.innerHTML = originalButtonText;
+                    downloadButton.disabled = false;
+                }).catch(err => {
+                    console.error("PDF generation failed:", err);
+                    document.body.removeChild(element);
+                    downloadButton.innerHTML = originalButtonText;
+                    downloadButton.disabled = false;
+                    alert("Gagal menjana PDF. Sila cuba lagi.");
+                });
+            };
 
             const chartCanvas = element.querySelector('#modalReportPieChart');
             const score = window.calculateScore();
 
-            if (score.totalAnswered > 0) {
-                 window.renderPieChart(score.answerBreakdown, chartCanvas);
+            if (score.totalAnswered > 0 && chartCanvas) {
+                // Render the chart and pass the PDF generation function as a callback
+                window.renderPieChart(score.answerBreakdown, chartCanvas, generateThePDF);
+            } else {
+                // If there's no chart, generate the PDF immediately
+                generateThePDF();
             }
-
-            const clientIdentifier = window.appState.answers.nama_perniagaan || window.auth.currentUser.email || 'Klien';
-            const filename = `Laporan_eHalalGAP_${clientIdentifier.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
-            const opt = { margin: 1, filename, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } };
-            
-            setTimeout(() => {
-                html2pdf().set(opt).from(element).save().then(() => {
-                    document.body.removeChild(element);
-                });
-            }, 500);
         };
 
         window.renderLogin = () => {
@@ -582,7 +610,11 @@
                 questions.forEach((question, index) => {
                     const id = `${step.id}_${index}`;
                     const answer = currentAnswers[id] || '';
-                    html += `<div class="bg-white p-5 rounded-xl shadow-lg border-t-4 border-teal-500/50"><p class="font-medium mb-3">${index + 1}. ${question}</p><div class="flex flex-wrap gap-3">${['YA', 'TIDAK'].map(option => `<button onclick="window.handleAnswer('${id}', '${option}', true)" class="px-5 py-2 rounded-full text-sm font-semibold transition ${answer === option ? 'bg-teal-600 text-white shadow-md' : 'bg-gray-100 hover:bg-teal-100'}">${option}</button>`).join('')}</div></div>`;
+                    let options = ['YA', 'TIDAK'];
+                    if (step.id === 'bahan' && index === 1) {
+                        options.push('Tidak Berkenaan');
+                    }
+                    html += `<div class="bg-white p-5 rounded-xl shadow-lg border-t-4 border-teal-500/50"><p class="font-medium mb-3">${index + 1}. ${question}</p><div class="flex flex-wrap gap-3">${options.map(option => `<button onclick="window.handleAnswer('${id}', '${option}', true)" class="px-5 py-2 rounded-full text-sm font-semibold transition ${answer === option ? 'bg-teal-600 text-white shadow-md' : 'bg-gray-100 hover:bg-teal-100'}">${option}</button>`).join('')}</div></div>`;
                 });
                 html += '</div>';
             } else if (step.type === 'selection') {
@@ -657,7 +689,7 @@
             if (progress >= 80) { status = 'Bersedia'; statusColor = 'bg-green-100 text-green-700 border-green-500'; recommendation = 'Tahniah! Perniagaan anda menunjukkan ketersediaan tinggi.'; }
             else if (progress >= 60) { status = 'Kurang Bersedia'; statusColor = 'bg-yellow-100 text-yellow-700 border-yellow-500'; recommendation = 'Perniagaan anda di tahap sederhana. Fokus pada jawapan "TIDAK".'; }
             else { status = 'Tidak Bersedia'; statusColor = 'bg-red-100 text-red-700 border-red-500'; recommendation = 'Perniagaan anda memerlukan penambahbaikan signifikan.'; }
-            return `<div class="space-y-8"><div class="p-6 rounded-xl shadow-lg border"><h3 class="text-2xl font-bold mb-4 text-center">Ringkasan Keputusan</h3><div class="flex flex-col sm:flex-row items-center justify-around text-center space-y-4 sm:space-y-0"><div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl mt-1">Peratus Ketersediaan</p></div><div><p class="text-5xl font-extrabold">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl mt-1">Mata Halal Diperolehi</p></div></div></div><div class="text-center p-6 rounded-xl border-4 ${statusColor} shadow-md"><p class="text-2xl font-bold">Status: <span class="text-3xl">${status.toUpperCase()}</span></p><p class="mt-4">${recommendation}</p></div><div class="p-6 bg-teal-50 rounded-xl shadow-lg border-l-4 border-teal-600"><h4 class="text-xl font-semibold mb-3">Ringkasan AI Gemini</h4><div id="ai-summary-content" class="text-base italic"><p class="animate-pulse text-teal-600">AI sedang menganalisis data...</p></div></div><div class="p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Jawapan</h4><div class="flex justify-center w-full max-w-lg mx-auto"><canvas id="reportPieChart" width="400" height="400"></canvas></div></div></div>`;
+            return `<div class="space-y-8"><div class="p-6 rounded-xl shadow-lg border"><h3 class="text-2xl font-bold mb-4 text-center">Ringkasan Keputusan</h3><div class="flex flex-col sm:flex-row items-center justify-around text-center space-y-4 sm:space-y-0"><div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl mt-1">Peratus Ketersediaan</p></div><div><p class="text-5xl font-extrabold">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl mt-1">Mata Halal Diperolehi</p></div></div></div><div class="text-center p-6 rounded-xl border-4 ${statusColor} shadow-md"><p class="text-2xl font-bold">Status: <span class="text-3xl">${status.toUpperCase()}</span></p><p class="mt-4">${recommendation}</p></div><div class="p-6 bg-teal-50 rounded-xl shadow-lg border-l-4 border-teal-600"><h4 class="text-xl font-semibold mb-2">Rumusan Eksekutif (Analisis AI)</h4><p class="text-xs text-gray-500 italic mb-3">*Ringkasan ini dijana oleh AI dan bertujuan sebagai panduan awal sahaja.</p><div id="ai-summary-content" class="text-base"><p class="animate-pulse text-teal-600">AI sedang menganalisis data...</p></div></div><div class="p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Jawapan</h4><div class="flex justify-center w-full max-w-lg mx-auto"><canvas id="reportPieChart" width="400" height="400"></canvas></div></div></div>`;
         };
 
         window.renderReportContent = () => {
@@ -679,7 +711,7 @@
                     <h1 class="text-2xl font-bold text-gray-700 mt-2">Laporan Semakan Jurang Halal</h1>
                     <p class="text-lg text-gray-500 mt-1">${clientIdentifier}</p>
                 </div>
-                <div class="p-6 rounded-xl shadow-lg border"><h3 class="text-2xl font-bold mb-4 text-center">Ringkasan Keputusan</h3><div class="flex flex-col sm:flex-row items-center justify-around text-center"><div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl mt-1">Ketersediaan</p></div><div><p class="text-5xl font-extrabold">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl mt-1">Mata Halal</p></div></div></div><div class="text-center p-6 rounded-xl border-4 ${statusColor} shadow-md"><p class="text-2xl font-bold">Status: <span class="text-3xl">${status.toUpperCase()}</span></p><p class="mt-4">${recommendation}</p></div><div class="p-6 bg-teal-50 rounded-xl shadow-lg border-l-4 border-teal-600"><h4 class="text-xl font-semibold mb-3">Ringkasan AI Gemini</h4><div class="text-base italic">${document.getElementById('ai-summary-content')?.innerHTML || '<p>Menjana...</p>'}</div></div><div class="p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Maklumat Perniagaan</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-bold">${['Nama Perniagaan','No SSM (jika ada)','Alamat','No Telefon','Nama Pemilik','Jualan tahunan perniagaan','Bilangan pekerja keseluruhan'].map(f => `<p><strong>${f}:</strong> ${answers[f.toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_')] || '- '}</p>`).join('')}</div></div>${clientReview ? `<div class="p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Ulasan Klien</h4><p class="text-sm whitespace-pre-wrap">${clientReview}</p></div>` : ''}<div class="p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Jawapan</h4><div class="flex justify-center w-full max-w-lg mx-auto"><canvas id="modalReportPieChart" width="400" height="400"></canvas></div></div><div class="p-6 bg-white rounded-xl shadow-lg border-t-4 border-red-500"><h4 class="text-xl font-bold text-red-700 mb-4 border-b pb-2">Jurang Pematuhan Kritikal</h4>${window.renderGapsTable(answers, scoredSections)}</div><div class="p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Mengikut Bahagian</h4>${scoredSections.map(sId => { const qs = (sId === 'syarat') ? flowSteps.find(s=>s.id===sId).questions : qaQuestions[sId]; const pts = questionPoints[sId] || []; let secMax=0, secScore=0; pts.forEach(p=>{secMax+=p;}); qs.forEach((q,idx) => { const ans = answers[`${sId}_${idx}`]; let isReady= (ans==='YA'); if(sId==='bahan'&& idx===3) isReady=(ans==='TIDAK'); if(isReady) secScore+=pts[idx]; }); const secPerc = secMax > 0 ? (secScore / secMax) * 100 : 0; const secTitle = flowSteps.find(s=>s.id===sId)?.title.replace(/^\d+\.\s*/, '') || sId; const barColor = secPerc >= 80 ? 'bg-green-500' : secPerc >= 60 ? 'bg-yellow-500' : 'bg-red-500'; return `<div class="mb-6 border-b pb-4"><h5 class="text-lg font-bold">${secTitle}</h5><div class="flex justify-between items-center mb-1"><span class="text-sm">Skor: ${secScore}/${secMax}</span><span class="text-lg font-bold">${secPerc.toFixed(0)}%</span></div><div class="w-full bg-gray-200 rounded-full h-3"><div class="${barColor} h-3 rounded-full" style="width: ${secPerc.toFixed(0)}%"></div></div></div>`; }).join('')}</div><div class="text-xs text-gray-500 text-center pt-4 border-t">&copy; Hak Cipta ACE UniKL MICET 2025.</div></div>`;
+                <div class="p-6 rounded-xl shadow-lg border"><h3 class="text-2xl font-bold mb-4 text-center">Ringkasan Keputusan</h3><div class="flex flex-col sm:flex-row items-center justify-around text-center"><div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl mt-1">Ketersediaan</p></div><div><p class="text-5xl font-extrabold">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl mt-1">Mata Halal</p></div></div></div><div class="text-center p-6 rounded-xl border-4 ${statusColor} shadow-md"><p class="text-2xl font-bold">Status: <span class="text-3xl">${status.toUpperCase()}</span></p><p class="mt-4">${recommendation}</p></div><div class="p-6 bg-teal-50 rounded-xl shadow-lg border-l-4 border-teal-600"><h4 class="text-xl font-semibold mb-2">Rumusan Eksekutif (Analisis AI)</h4><p class="text-xs text-gray-500 italic mb-3">*Ringkasan ini dijana oleh AI dan bertujuan sebagai panduan awal sahaja.</p><div class="text-base">${document.getElementById('ai-summary-content')?.innerHTML || '<p>Menjana...</p>'}</div></div><div class="p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Maklumat Perniagaan</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-bold">${['Nama Perniagaan','No SSM (jika ada)','Alamat','No Telefon','Nama Pemilik','Jualan tahunan perniagaan','Bilangan pekerja keseluruhan'].map(f => `<p><strong>${f}:</strong> ${answers[f.toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_')] || '- '}</p>`).join('')}</div></div>${clientReview ? `<div class="p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Ulasan Klien</h4><p class="text-sm whitespace-pre-wrap">${clientReview}</p></div>` : ''}<div class="p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Jawapan</h4><div class="flex justify-center w-full max-w-lg mx-auto"><canvas id="modalReportPieChart" width="400" height="400"></canvas></div></div><div class="p-6 bg-white rounded-xl shadow-lg border-t-4 border-red-500"><h4 class="text-xl font-bold text-red-700 mb-4 border-b pb-2">Jurang Pematuhan Kritikal</h4>${window.renderGapsTable(answers, scoredSections)}</div><div class="p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Mengikut Bahagian</h4>${scoredSections.map(sId => { const qs = (sId === 'syarat') ? flowSteps.find(s=>s.id===sId).questions : qaQuestions[sId]; const pts = questionPoints[sId] || []; let secMax=0, secScore=0; pts.forEach(p=>{secMax+=p;}); qs.forEach((q,idx) => { const ans = answers[`${sId}_${idx}`]; let isReady= (ans==='YA'); if(sId==='bahan'&& idx===3) isReady=(ans==='TIDAK'); if(isReady) secScore+=pts[idx]; }); const secPerc = secMax > 0 ? (secScore / secMax) * 100 : 0; const secTitle = flowSteps.find(s=>s.id===sId)?.title.replace(/^\d+\.\s*/, '') || sId; const barColor = secPerc >= 80 ? 'bg-green-500' : secPerc >= 60 ? 'bg-yellow-500' : 'bg-red-500'; return `<div class="mb-6 border-b pb-4"><h5 class="text-lg font-bold">${secTitle}</h5><div class="flex justify-between items-center mb-1"><span class="text-sm">Skor: ${secScore}/${secMax}</span><span class="text-lg font-bold">${secPerc.toFixed(0)}%</span></div><div class="w-full bg-gray-200 rounded-full h-3"><div class="${barColor} h-3 rounded-full" style="width: ${secPerc.toFixed(0)}%"></div></div></div>`; }).join('')}</div><div class="text-xs text-gray-500 text-center pt-4 border-t">&copy; Hak Cipta ACE UniKL MICET 2025.</div></div>`;
         };
 
         window.handleAnswer = (key, value, shouldRender) => {
