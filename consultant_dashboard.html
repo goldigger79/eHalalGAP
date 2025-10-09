@@ -89,9 +89,9 @@
         // --- ALL QUESTIONNAIRE AND SCORING DATA (Copied from client.html) ---
         const flowSteps = [
              { id: 'maklumat', title: '1. Maklumat Perniagaan', type: 'form'},
-             { id: 'syarat', title: '2. Syarat Kelayakan', type: 'checklist', questions: ["Adakah perniagaan berdaftar dengan Suruhanjaya Perniagaan Malaysia (SSM)?","Adakah perniagaan Telah beroperasi sepenuhnya sekurang-kurangnya 3 bulan?","Adakah perniagaan Memiliki lesen atau kelulusan daripada PBT?","Jika premis makanan, adakah telah mendapat perakuan FOSIM? *","Jika skim kosmetik, adakah telah mendapat perakuan NPRA? *",]},
-             { id: 'kategori', title: '3. Kategori Industri', type: 'selection', options: ['Mikro', 'Kecil', 'Sederhana', 'Besar']},
-             { id: 'skim', title: '4. Skim Pensijilan', type: 'selection', options: ['Produk Makanan dan Minuman', 'Produk Kosmetik', 'Produk Farmaseutikal', 'Premis Makanan', 'Produk Barang Gunaan', 'Perkhidmatan Logistik', 'Rumah Sembelihan', 'Pengilangan Kontrak/OEM', 'Produk Peranti Perubatan']},
+             { id: 'kategori', title: '2. Kategori Industri', type: 'selection', options: ['Mikro', 'Kecil', 'Sederhana', 'Besar']},
+             { id: 'skim', title: '3. Skim Pensijilan', type: 'selection', options: ['Produk Makanan dan Minuman', 'Produk Kosmetik', 'Produk Farmaseutikal', 'Premis Makanan', 'Produk Barang Gunaan', 'Perkhidmatan Logistik', 'Rumah Sembelihan', 'Pengilangan Kontrak/OEM', 'Produk Peranti Perubatan']},
+             { id: 'syarat', title: '4. Umum', type: 'checklist', questions: ["Adakah perniagaan berdaftar dengan Suruhanjaya Perniagaan Malaysia (SSM)?","Adakah perniagaan Telah beroperasi sepenuhnya sekurang-kurangnya 3 bulan?","Adakah perniagaan Memiliki lesen atau kelulusan daripada PBT?","Jika premis makanan, adakah telah mendapat perakuan FOSIM? *","Jika skim kosmetik, adakah telah mendapat perakuan NPRA? *",]},
              { id: 'premis', title: '5. Premis', type: 'qa'},
              { id: 'bahan', title: '6. Bahan Mentah & Peralatan', type: 'qa'},
              { id: 'sanitasi', title: '7. Sanitasi', type: 'qa'},
@@ -117,7 +117,6 @@
         };
         // --------------------------------------------------------------------
 
-        // --- Functions to Calculate Score and Render Report (Adapted from client.html) ---
         const calculateScore = (answers) => {
             const MAX_TOTAL_POINTS = 308;
             let totalPointsScored = 0, totalScoredQuestions = 0, totalAnswered = 0, countYa = 0, countTidak = 0;
@@ -133,32 +132,28 @@
                     if (answer) {
                         totalAnswered++;
                         let isReadyAnswer = (answer === 'YA');
-                        if (sectionId === 'bahan' && (index === 3 || index === 4)) { isReadyAnswer = (answer === 'TIDAK'); }
-                        if (isReadyAnswer) { totalPointsScored += (points[index] || 0); countYa++; } else if (answer === 'TIDAK') { countTidak++; }
+                        if (sectionId === 'bahan' && index === 3) { isReadyAnswer = (answer === 'TIDAK'); }
+                        if ((sectionId === 'syarat' && (index === 3 || index === 4)) || (sectionId === 'bahan' && index === 1)) {
+                            isReadyAnswer = (answer === 'YA' || answer === 'Tidak Berkenaan');
+                        }
+                        if (isReadyAnswer) { totalPointsScored += (points[index] || 0); }
+                        if (answer === 'YA' || answer === 'Tidak Berkenaan') { countYa++; } else if (answer === 'TIDAK') { countTidak++; }
                     }
                 });
             });
 
             const readinessScore = MAX_TOTAL_POINTS > 0 ? (totalPointsScored / MAX_TOTAL_POINTS) * 100 : 0;
-            return { readinessScore, totalPointsScored, totalQuestions: MAX_TOTAL_POINTS, answerBreakdown: { ya: countYa, tidak: countTidak, notAnswered: totalScoredQuestions - totalAnswered } };
+            return { readinessScore: parseFloat(readinessScore.toFixed(2)), totalPointsScored, totalQuestions: MAX_TOTAL_POINTS, totalAnswered, totalScoredQuestions, answerBreakdown: { ya: countYa, tidak: countTidak, notAnswered: totalScoredQuestions - totalAnswered } };
         };
 
-        const renderPieChart = (answerBreakdown, canvasId) => {
-             const ctx = document.getElementById(canvasId);
-            if (!ctx) return;
-            const existingChart = Chart.getChart(ctx);
+        const renderPieChart = (answerBreakdown, canvasTarget, onCompleteCallback = null) => {
+            let canvasEl = typeof canvasTarget === 'string' ? document.getElementById(canvasTarget) : canvasTarget;
+            if (!canvasEl) { if (onCompleteCallback) onCompleteCallback(); return null; }
+            const existingChart = Chart.getChart(canvasEl);
             if (existingChart) { existingChart.destroy(); }
-            new Chart(ctx, {
-                type: 'pie',
-                data: {
-                    labels: ['YA (Halal Ready)', 'TIDAK (Perlu Tindakan)', 'Belum Dijawab'],
-                    datasets: [{
-                        data: [answerBreakdown.ya, answerBreakdown.tidak, answerBreakdown.notAnswered],
-                        backgroundColor: ['#0d9488', '#dc2626', '#e5e7eb'],
-                        hoverOffset: 4
-                    }]
-                },
-                options: { responsive: true, plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Analisis Jawapan Keseluruhan' } } }
+            return new Chart(canvasEl, {
+                type: 'pie', data: { labels: ['YA (Halal Ready)', 'TIDAK (Perlu Tindakan)', 'Belum Dijawab'], datasets: [{ data: [answerBreakdown.ya, answerBreakdown.tidak, answerBreakdown.notAnswered], backgroundColor: ['#0d9488', '#dc2626', '#e5e7eb'], hoverOffset: 4 }] },
+                options: { responsive: true, animation: { onComplete: () => { if (onCompleteCallback) onCompleteCallback(); } }, plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Analisis Jawapan Keseluruhan' } } }
             });
         };
         
@@ -172,40 +167,14 @@
                 questions.forEach((q, index) => {
                     const answer = answers[`${sectionId}_${index}`];
                     let isGap = false;
-                    if (sectionId === 'bahan' && (index === 3 || index === 4)) {
-                        isGap = (answer === 'YA');
-                    } else {
-                        isGap = (answer === 'TIDAK');
-                    }
-                    if (isGap) {
-                        allGaps.push({ section: secTitle, question: q.replace(/\*/g, '').trim(), pointValue: points[index] || 0 });
-                    }
+                    if (sectionId === 'bahan' && index === 3) { isGap = (answer === 'YA'); } 
+                    else { isGap = (answer === 'TIDAK'); }
+                    if (isGap) { allGaps.push({ section: secTitle, question: q.replace(/\*/g, '').trim(), pointValue: points[index] || 0 }); }
                 });
             });
 
             if (allGaps.length === 0) return '<p class="text-sm text-green-600 p-4 border rounded-lg bg-green-50">Tiada jurang kritikal dikesan.</p>';
-
-            return `
-                <div class="overflow-x-auto shadow-md rounded-lg">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bahagian</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Soalan Jurang (GAP)</th>
-                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Mata Hilang</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            ${allGaps.map(gap => `
-                                <tr class="hover:bg-red-50/50">
-                                    <td class="px-6 py-4 text-sm font-medium text-red-700">${gap.section}</td>
-                                    <td class="px-6 py-4 text-sm text-gray-900">${gap.question}</td>
-                                    <td class="px-6 py-4 text-center text-sm font-bold text-red-600">${gap.pointValue}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>`;
+            return `<div class="overflow-x-auto shadow-md rounded-lg"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bahagian</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Soalan Jurang (GAP)</th><th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Mata Hilang</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">${allGaps.map(gap => `<tr class="hover:bg-red-50/50"><td class="px-6 py-4 text-sm font-medium text-red-700">${gap.section}</td><td class="px-6 py-4 text-sm text-gray-900">${gap.question}</td><td class="px-6 py-4 text-center text-sm font-bold text-red-600">${gap.pointValue}</td></tr>`).join('')}</tbody></table></div>`;
         };
         
         const renderReportContent = (client, answers, score) => {
@@ -217,7 +186,7 @@
             else { status = 'Tidak Bersedia'; statusColor = 'bg-red-100 text-red-700 border-red-500'; recommendation = 'Perniagaan memerlukan penambahbaikan signifikan.'; }
 
             const clientReview = answers['ulasan_cabaran_utama'];
-            const aiSummary = answers.aiSummary || 'Rumusan AI belum dijana oleh klien, atau berlaku ralat semasa penjanaan.';
+            const aiSummary = answers.aiSummary || 'Rumusan AI belum dijana oleh klien.';
             const scoredSections = ['syarat', 'premis', 'bahan', 'sanitasi', 'pekerja', 'dokumentasi'];
 
             return `
@@ -227,26 +196,13 @@
                         <p class="text-lg text-gray-500 mt-1">Klien: ${client.clientName || 'Tidak Dinamakan'}</p>
                         <p class="text-sm text-gray-500">ID Klien: ${client.userId}</p>
                     </div>
-
                     <div class="p-6 rounded-xl shadow-lg border border-gray-100 page-break"><h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Ringkasan Keputusan</h3><div class="flex flex-col sm:flex-row items-center justify-around text-center space-y-4 sm:space-y-0"><div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl text-gray-500 mt-1">Peratus Ketersediaan</p></div><div><p class="text-5xl font-extrabold text-gray-800">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl text-gray-500 mt-1">Mata Halal Diperolehi</p></div></div></div>
-
                     <div class="text-center p-6 rounded-xl border-4 ${statusColor} shadow-md"><p class="text-2xl font-bold">Status: <span class="text-3xl">${status.toUpperCase()}</span></p><p class="mt-4 text-md">${recommendation}</p></div>
-
-                    <div class="p-6 bg-teal-50 rounded-xl shadow-lg border-l-4 border-teal-600 page-break"><h4 class="text-xl font-semibold mb-2">Rumusan Analisis AI</h4><p class="text-xs text-gray-500 italic mb-3">*Ringkasan ini dijana oleh AI dan bertujuan sebagai panduan awal sahaja.</p><div id="ai-summary-content" class="text-base">${aiSummary}</div></div>
-                    
-                     <div class="p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-200 page-break"><h4 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Maklumat Perniagaan</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">${['Nama Perniagaan', 'No SSM (jika ada)', 'Alamat', 'No Telefon', 'Nama Pemilik', 'Jualan tahunan perniagaan', 'Bilangan pekerja keseluruhan'].map(field => {
-                                const id = field.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_'); 
-                                return `<p><strong>${field}:</strong> ${answers[id] || '- Tidak diisi -'}</p>`;
-                            }).join('')}</div></div>
-
-                    ${clientReview ? `
-                        <div class="p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-200 page-break"><h4 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Ulasan Cabaran oleh Klien</h4><p class="text-sm text-gray-700 whitespace-pre-wrap">${clientReview}</p></div>` : ''
-                    }
-
+                    <div class="p-6 bg-teal-50 rounded-xl shadow-lg border-l-4 border-teal-600 page-break"><h4 class="text-xl font-semibold mb-2">Rumusan Analisis AI</h4><p class="text-xs text-gray-500 italic mb-3">*Ringkasan ini dijana oleh AI dan bertujuan sebagai panduan awal sahaja.</p><div class="text-base">${aiSummary}</div></div>
+                    <div class="p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-200 page-break"><h4 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Maklumat Perniagaan</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">${['Nama Perniagaan', 'No SSM (jika ada)', 'Alamat', 'No Telefon', 'Nama Pemilik', 'Jualan tahunan perniagaan', 'Bilangan pekerja keseluruhan'].map(field => `<p><strong>${field}:</strong> ${answers[field.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_')] || '- Tidak diisi -'}</p>`).join('')}</div></div>
+                    ${clientReview ? `<div class="p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-200 page-break"><h4 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Ulasan Cabaran oleh Klien</h4><p class="text-sm text-gray-700 whitespace-pre-wrap">${clientReview}</p></div>` : ''}
                     <div class="p-6 bg-white rounded-xl shadow-lg page-break"><h4 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-2 text-center">Analisis Jawapan Keseluruhan</h4><div class="flex justify-center w-full max-w-lg mx-auto"><canvas id="modalReportPieChart" width="400" height="400"></canvas></div></div>
-                    
                     <div class="p-6 bg-white rounded-xl shadow-lg border-t-4 border-red-500 page-break"><h4 class="text-xl font-bold text-red-700 mb-4 border-b pb-2">Jurang Pematuhan Kritikal</h4>${renderGapsTable(answers, scoredSections)}</div>
-
                     <div class="p-6 bg-white rounded-xl shadow-lg page-break"><h4 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-2">Analisis Mengikut Bahagian</h4>${scoredSections.map(sectionId => {
                             const questions = (sectionId === 'syarat') ? flowSteps.find(s => s.id === 'syarat').questions : qaQuestions[sectionId];
                             const points = questionPoints[sectionId] || [];
@@ -256,7 +212,7 @@
                                 const answer = answers[`${sectionId}_${index}`];
                                 let isReadyAnswer = (answer === 'YA');
                                 if (sectionId === 'bahan' && (index === 3 || index === 4)) { isReadyAnswer = (answer === 'TIDAK'); }
-                                if (isReadyAnswer) { secPointsScored += points[index]; }
+                                if (isReadyAnswer) { secPointsScored += points[index] || 0; }
                             });
                             const secPercentage = secMaxPoints > 0 ? (secPointsScored / secMaxPoints) * 100 : 0;
                             const secTitle = flowSteps.find(s => s.id === sectionId)?.title.replace(/^\d+\.\s*/, '') || sectionId;
@@ -271,39 +227,27 @@
                                     <div class="w-full bg-gray-200 rounded-full h-3"><div class="${barColor} h-3 rounded-full" style="width: ${secPercentage.toFixed(0)}%"></div></div>
                                 </div>`;
                         }).join('')}</div>
-
                     <div class="text-xs text-gray-500 text-center pt-4 border-t">&copy; Hak Cipta ACE UniKL MICET 2025.</div>
                 </div>`;
         };
 
-        const downloadPDF = () => {
-            if (!selectedClientData) {
-                alert("Sila pilih klien dan jana laporan terlebih dahulu.");
-                return;
-            }
-            const { client, answers, score } = selectedClientData;
-            
-            // Re-render content specifically for PDF generation to ensure chart is included
-            const element = document.createElement('div');
-            element.innerHTML = renderReportContent(client, answers, score);
-            
-            // Append to body temporarily to render chart
-            document.body.appendChild(element);
-            const chartCanvas = element.querySelector('#modalReportPieChart');
-            renderPieChart(score.answerBreakdown, chartCanvas.id);
+        window.printReport = async () => {
+            const modalBody = document.getElementById('modal-report-body');
+            if (!modalBody) return alert("Tiada laporan untuk dicetak.");
 
-            const filename = `Laporan_eHalalGAP_${(client.clientName || 'Klien').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
-            const opt = { margin: 0.5, filename, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' } };
+            const { client, answers, score } = selectedClientData;
+            modalBody.innerHTML = renderReportContent(client, answers, score);
             
-            // Add a small delay for chart to render before generating PDF
-            setTimeout(() => {
-                html2pdf().set(opt).from(element).save().then(() => {
-                    document.body.removeChild(element); // Clean up the temporary element
+            if (score.totalAnswered > 0) {
+                await new Promise((resolve) => {
+                    renderPieChart(score.answerBreakdown, 'modalReportPieChart', resolve);
                 });
-            }, 500);
+            }
+
+            await new Promise(r => setTimeout(r, 400));
+            window.print();
         };
-        window.downloadPDF = downloadPDF;
-        
+
         window.viewReport = async (userId) => {
             const reportBody = document.getElementById('modal-report-body');
             reportBody.innerHTML = '<p class="text-center p-8">Memuatkan data klien...</p>';
