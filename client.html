@@ -106,10 +106,12 @@
 
         /* Print-specific styles */
         @media print {
+             /* Pastikan hanya laporan dicetak */
             body * {
                 visibility: hidden;
             }
-            #modal-report-body, #modal-report-body * {
+            #modal-report-body,
+            #modal-report-body * {
                 visibility: visible;
             }
             #report-modal {
@@ -117,17 +119,14 @@
                 left: 0;
                 top: 0;
                 width: 100%;
-                height: auto;
-                overflow: visible;
+                background: white;
                 display: block !important;
-                background-color: white;
                 padding: 0;
+                margin: 0;
             }
             .modal-content {
                 box-shadow: none;
                 border: none;
-                padding: 0;
-                margin: 0;
                 width: 100%;
                 max-width: 100%;
                 border-radius: 0;
@@ -135,13 +134,23 @@
             .print-hidden {
                 display: none !important;
             }
+            /* Tambah kawalan saiz & scaling A4 */
+            #modal-report-body {
+                width: 210mm;        /* Lebar A4 */
+                min-height: 297mm;     /* Tinggi A4 */
+                margin: 0 auto;
+                padding: 20mm;
+                box-sizing: border-box;
+                transform: scale(0.9);   /* Laraskan jika masih terlalu besar */
+                transform-origin: top center;
+            }
+            /* Gaya khas untuk setiap halaman */
             .page-break {
                 page-break-before: always;
-                break-before: page;
             }
-             @page {
+            @page {
                 size: A4;
-                margin: 2cm;
+                margin: 10mm; /* margin fizikal cetak */
             }
         }
     </style>
@@ -571,22 +580,14 @@
         window.printReport = async () => {
             const modalBody = document.getElementById('modal-report-body');
             if (!modalBody) return alert("Tiada laporan untuk dicetak.");
-
-            // Pastikan laporan telah di-render sepenuhnya
             modalBody.innerHTML = window.renderReportContent();
-            
-            // Render carta dahulu
             const score = window.calculateScore();
             if (score.totalAnswered > 0) {
                 await new Promise((resolve) => {
                     window.renderPieChart(score.answerBreakdown, 'modalReportPieChart', resolve);
                 });
             }
-
-            // Tunggu sedikit masa bagi browser lukis elemen sepenuhnya
             await new Promise(r => setTimeout(r, 400));
-
-            // Sekarang barulah panggil print
             window.print();
         };
 
