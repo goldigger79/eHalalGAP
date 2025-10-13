@@ -133,14 +133,18 @@
                     if (answer) {
                         totalAnswered++;
                         let isReadyAnswer = (answer === 'YA');
-                        if (sectionId === 'bahan' && (index === 3 || index === 4)) { isReadyAnswer = (answer === 'TIDAK'); }
-                        if (isReadyAnswer) { totalPointsScored += (points[index] || 0); countYa++; } else if (answer === 'TIDAK') { countTidak++; }
+                        if (sectionId === 'bahan' && index === 3) { isReadyAnswer = (answer === 'TIDAK'); }
+                        if ((sectionId === 'syarat' && (index === 3 || index === 4)) || (sectionId === 'bahan' && index === 1)) {
+                            isReadyAnswer = (answer === 'YA' || answer === 'Tidak Berkenaan');
+                        }
+                        if (isReadyAnswer) { totalPointsScored += (points[index] || 0); }
+                        if (answer === 'YA' || answer === 'Tidak Berkenaan') { countYa++; } else if (answer === 'TIDAK') { countTidak++; }
                     }
                 });
             });
 
             const readinessScore = MAX_TOTAL_POINTS > 0 ? (totalPointsScored / MAX_TOTAL_POINTS) * 100 : 0;
-            return { readinessScore, totalPointsScored, totalQuestions: MAX_TOTAL_POINTS, answerBreakdown: { ya: countYa, tidak: countTidak, notAnswered: totalScoredQuestions - totalAnswered } };
+            return { readinessScore: parseFloat(readinessScore.toFixed(2)), totalPointsScored, totalQuestions: MAX_TOTAL_POINTS, totalAnswered, totalScoredQuestions, answerBreakdown: { ya: countYa, tidak: countTidak, notAnswered: totalScoredQuestions - totalAnswered } };
         };
 
         const renderPieChart = (answerBreakdown, canvasTarget, onCompleteCallback = null) => {
@@ -149,15 +153,7 @@
             const existingChart = Chart.getChart(canvasEl);
             if (existingChart) { existingChart.destroy(); }
             return new Chart(canvasEl, {
-                type: 'pie',
-                data: {
-                    labels: ['YA (Halal Ready)', 'TIDAK (Perlu Tindakan)', 'Belum Dijawab'],
-                    datasets: [{
-                        data: [answerBreakdown.ya, answerBreakdown.tidak, answerBreakdown.notAnswered],
-                        backgroundColor: ['#0d9488', '#dc2626', '#e5e7eb'],
-                        hoverOffset: 4
-                    }]
-                },
+                type: 'pie', data: { labels: ['YA (Halal Ready)', 'TIDAK (Perlu Tindakan)', 'Belum Dijawab'], datasets: [{ data: [answerBreakdown.ya, answerBreakdown.tidak, answerBreakdown.notAnswered], backgroundColor: ['#0d9488', '#dc2626', '#e5e7eb'], hoverOffset: 4 }] },
                 options: { 
                     responsive: true, 
                     animation: {
@@ -181,14 +177,9 @@
                 questions.forEach((q, index) => {
                     const answer = answers[`${sectionId}_${index}`];
                     let isGap = false;
-                    if (sectionId === 'bahan' && (index === 3 || index === 4)) {
-                        isGap = (answer === 'YA');
-                    } else {
-                        isGap = (answer === 'TIDAK');
-                    }
-                    if (isGap) {
-                        allGaps.push({ section: secTitle, question: q.replace(/\*/g, '').trim(), pointValue: points[index] || 0 });
-                    }
+                    if (sectionId === 'bahan' && index === 3) { isGap = (answer === 'YA'); } 
+                    else { isGap = (answer === 'TIDAK'); }
+                    if (isGap) { allGaps.push({ section: secTitle, question: q.replace(/\*/g, '').trim(), pointValue: points[index] || 0 }); }
                 });
             });
 
