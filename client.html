@@ -112,6 +112,8 @@
             body * {
                 visibility: hidden;
             }
+            /* FIX: Ensure the modal container itself is also visible */
+            #report-modal,
             #modal-report-body,
             #modal-report-body * {
                 visibility: visible;
@@ -138,12 +140,12 @@
             }
             /* Tambah kawalan saiz & scaling A4 */
             #modal-report-body {
-                width: 210mm;        /* Lebar A4 */
-                min-height: 297mm;     /* Tinggi A4 */
+                width: 210mm;      /* Lebar A4 */
+                min-height: 297mm;    /* Tinggi A4 */
                 margin: 0 auto;
                 padding: 20mm;
                 box-sizing: border-box;
-                transform: scale(0.9);   /* Laraskan jika masih terlalu besar */
+                transform: scale(0.9);  /* Laraskan jika masih terlalu besar */
                 transform-origin: top center;
             }
             /* Gaya khas untuk setiap halaman */
@@ -583,10 +585,10 @@
             const modalBody = document.getElementById('modal-report-body');
             if (!modalBody) return alert("Tiada laporan untuk dicetak.");
 
-            // Pastikan laporan telah di-render sepenuhnya
+            // Ensure the report is fully rendered
             modalBody.innerHTML = window.renderReportContent();
             
-            // Render carta dahulu
+            // Render the chart first
             const score = window.calculateScore();
             if (score.totalAnswered > 0) {
                 await new Promise((resolve) => {
@@ -594,12 +596,54 @@
                 });
             }
 
-            // Tunggu sedikit masa bagi browser lukis elemen sepenuhnya
+            // Wait a moment for the browser to draw all elements
             await new Promise(r => setTimeout(r, 400));
 
-            // Sekarang barulah panggil print
+            // Now call the print function
             window.print();
         };
+
+        // NEW: Function to download the report as PDF
+        window.downloadReportPDF = async () => {
+            const reportElement = document.getElementById('modal-report-body');
+            if (!reportElement) {
+                alert("Ralat: Elemen laporan tidak ditemui untuk dimuat turun.");
+                return;
+            }
+
+            const downloadButton = document.querySelector('button[onclick="window.downloadReportPDF()"]');
+            const originalButtonText = downloadButton.innerHTML;
+            downloadButton.innerHTML = '<span class="animate-pulse">Menjana PDF...</span>';
+            downloadButton.disabled = true;
+
+            // Ensure the content is fresh and the chart is rendered
+            reportElement.innerHTML = window.renderReportContent();
+            const score = window.calculateScore();
+            if (score.totalAnswered > 0) {
+                await new Promise(resolve => window.renderPieChart(score.answerBreakdown, 'modalReportPieChart', resolve));
+            }
+            
+            // Wait for DOM to update
+             await new Promise(r => setTimeout(r, 500));
+
+            const clientName = window.appState.answers['nama_perniagaan'] || 'laporan-ehalalgap';
+            const filename = `${clientName.replace(/\s+/g, '_').toLowerCase()}_${new Date().toISOString().slice(0,10)}.pdf`;
+            
+            const opt = {
+                margin: 10,
+                filename: filename,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            await html2pdf().set(opt).from(reportElement).save();
+            
+            // Restore button state
+            downloadButton.innerHTML = originalButtonText;
+            downloadButton.disabled = false;
+        };
+
 
         window.renderLogin = () => {
             const isRegister = window.appState.isRegisterMode;
@@ -845,4 +889,3 @@
     </div>
 </body>
 </html>
-
