@@ -11,6 +11,9 @@
     <link rel="manifest" href="https://raw.githubusercontent.com/goldigger79/eHalalGAP/main/site.webmanifest">
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Libraries for PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <!-- Load Chart.js for visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
@@ -23,47 +26,7 @@
         .btn-secondary:hover { background-color: #d1d5db; }
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 50; overflow-y: auto; padding: 20px; }
         .modal-content { background-color: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 95%; max-width: 1200px; max-height: 95vh; overflow-y: auto; position: relative; }
-        
-        /* Print-specific styles */
-        @media print {
-            body * {
-                visibility: hidden;
-            }
-            #modal-report-body, #modal-report-body * {
-                visibility: visible;
-            }
-            #report-modal {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                height: auto;
-                overflow: visible;
-                display: block !important;
-                background-color: white;
-                padding: 0;
-            }
-            .modal-content {
-                box-shadow: none;
-                border: none;
-                padding: 0;
-                margin: 0;
-                width: 100%;
-                max-width: 100%;
-                border-radius: 0;
-            }
-            .print-hidden {
-                display: none !important;
-            }
-            .page-break {
-                page-break-before: always;
-                break-before: page;
-            }
-             @page {
-                size: A4;
-                margin: 2cm;
-            }
-        }
+        .print-hidden { display: none !important; }
     </style>
     <!-- Firebase SDKs -->
     <script type="module">
@@ -89,9 +52,9 @@
         // --- ALL QUESTIONNAIRE AND SCORING DATA (Copied from client.html) ---
         const flowSteps = [
              { id: 'maklumat', title: '1. Maklumat Perniagaan', type: 'form'},
-             { id: 'syarat', title: '2. Syarat Kelayakan', type: 'checklist', questions: ["Adakah perniagaan berdaftar dengan Suruhanjaya Perniagaan Malaysia (SSM)?","Adakah perniagaan Telah beroperasi sepenuhnya sekurang-kurangnya 3 bulan?","Adakah perniagaan Memiliki lesen atau kelulusan daripada PBT?","Jika premis makanan, adakah telah mendapat perakuan FOSIM? *","Jika skim kosmetik, adakah telah mendapat perakuan NPRA? *",]},
-             { id: 'kategori', title: '3. Kategori Industri', type: 'selection', options: ['Mikro', 'Kecil', 'Sederhana', 'Besar']},
-             { id: 'skim', title: '4. Skim Pensijilan', type: 'selection', options: ['Produk Makanan dan Minuman', 'Produk Kosmetik', 'Produk Farmaseutikal', 'Premis Makanan', 'Produk Barang Gunaan', 'Perkhidmatan Logistik', 'Rumah Sembelihan', 'Pengilangan Kontrak/OEM', 'Produk Peranti Perubatan']},
+             { id: 'kategori', title: '2. Kategori Industri', type: 'selection', options: ['Mikro (Jualan Tahunan < RM300,000 ATAU Pekerja < 5 orang)', 'Kecil (Jualan Tahunan RM300,000 - RM 15 juta ATAU Pekerja 5 - 75 orang)', 'Sederhana (Jualan Tahunan RM 15 juta - RM 50 juta ATAU Pekerja 75 - 200 orang)', 'Besar (Jualan Tahunan > RM 50 juta ATAU Pekerja > 200 orang)']},
+             { id: 'skim', title: '3. Skim Pensijilan', type: 'selection', options: ['Produk Makanan dan Minuman', 'Produk Kosmetik', 'Produk Farmaseutikal', 'Premis Makanan', 'Produk Barang Gunaan', 'Perkhidmatan Logistik', 'Rumah Sembelihan', 'Pengilangan Kontrak/OEM', 'Produk Peranti Perubatan']},
+             { id: 'syarat', title: '4. Umum', type: 'checklist', questions: ["Adakah perniagaan berdaftar dengan Suruhanjaya Perniagaan Malaysia (SSM)?","Adakah perniagaan Telah beroperasi sepenuhnya sekurang-kurangnya 3 bulan?","Adakah perniagaan Memiliki lesen atau kelulusan daripada PBT?","Jika premis makanan, adakah telah mendapat perakuan FOSIM? *","Jika skim kosmetik, adakah telah mendapat perakuan NPRA? *",]},
              { id: 'premis', title: '5. Premis', type: 'qa'},
              { id: 'bahan', title: '6. Bahan Mentah & Peralatan', type: 'qa'},
              { id: 'sanitasi', title: '7. Sanitasi', type: 'qa'},
@@ -221,62 +184,152 @@
             const scoredSections = ['syarat', 'premis', 'bahan', 'sanitasi', 'pekerja', 'dokumentasi'];
 
             return `
-                <div id="pdf-content-container" class="p-8 space-y-8 bg-white">
-                    <div class="text-center pb-4 border-b border-gray-200">
-                        <h1 class="text-3xl font-extrabold text-gray-800">Laporan Semakan Jurang Halal (eHalalGAP)</h1>
-                        <p class="text-lg text-gray-500 mt-1">Klien: ${client.clientName || 'Tidak Dinamakan'}</p>
-                        <p class="text-sm text-gray-500">ID Klien: ${client.userId}</p>
+                <div id="pdf-content-container" class="bg-white p-8">
+                    <!-- Section 1: Header & Summary -->
+                    <div class="text-center pb-4 border-b">
+                        <h2 class="text-3xl font-extrabold text-gray-800">eHalal<span class="text-teal-600">GAP</span></h2>
+                        <h1 class="text-2xl font-bold text-gray-700 mt-2">Laporan Semakan Jurang Halal</h1>
+                        <p class="text-lg text-gray-500 mt-1">${client.clientName || 'Tidak Dinamakan'}</p>
                     </div>
-                    <div class="p-6 rounded-xl shadow-lg border border-gray-100 page-break"><h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">Ringkasan Keputusan</h3><div class="flex flex-col sm:flex-row items-center justify-around text-center space-y-4 sm:space-y-0"><div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl text-gray-500 mt-1">Peratus Ketersediaan</p></div><div><p class="text-5xl font-extrabold text-gray-800">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl text-gray-500 mt-1">Mata Halal Diperolehi</p></div></div></div>
-                    <div class="text-center p-6 rounded-xl border-4 ${statusColor} shadow-md"><p class="text-2xl font-bold">Status: <span class="text-3xl">${status.toUpperCase()}</span></p><p class="mt-4 text-md">${recommendation}</p></div>
-                    <div class="p-6 bg-teal-50 rounded-xl shadow-lg border-l-4 border-teal-600 page-break"><h4 class="text-xl font-semibold mb-2">Rumusan Analisis AI</h4><p class="text-xs text-gray-500 italic mb-3">*Ringkasan ini dijana oleh AI dan bertujuan sebagai panduan awal sahaja.</p><div class="text-base">${aiSummary}</div></div>
-                    <div class="p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-200 page-break"><h4 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Maklumat Perniagaan</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">${['Nama Perniagaan', 'No SSM (jika ada)', 'Alamat', 'No Telefon', 'Nama Pemilik', 'Jualan tahunan perniagaan', 'Bilangan pekerja keseluruhan'].map(field => `<p><strong>${field}:</strong> ${answers[field.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_')] || '- Tidak diisi -'}</p>`).join('')}</div></div>
-                    ${clientReview ? `<div class="p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-200 page-break"><h4 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Ulasan Cabaran oleh Klien</h4><p class="text-sm text-gray-700 whitespace-pre-wrap">${clientReview}</p></div>` : ''}
-                    <div class="p-6 bg-white rounded-xl shadow-lg page-break"><h4 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-2 text-center">Analisis Jawapan Keseluruhan</h4><div class="flex justify-center w-full max-w-lg mx-auto"><canvas id="modalReportPieChart" width="400" height="400"></canvas></div></div>
-                    <div class="p-6 bg-white rounded-xl shadow-lg border-t-4 border-red-500 page-break"><h4 class="text-xl font-bold text-red-700 mb-4 border-b pb-2">Jurang Pematuhan Kritikal</h4>${renderGapsTable(answers, scoredSections)}</div>
-                    <div class="p-6 bg-white rounded-xl shadow-lg page-break"><h4 class="text-xl font-semibold text-gray-800 mb-6 border-b pb-2">Analisis Mengikut Bahagian</h4>${scoredSections.map(sectionId => {
-                            const questions = (sectionId === 'syarat') ? flowSteps.find(s => s.id === 'syarat').questions : qaQuestions[sectionId];
-                            const points = questionPoints[sectionId] || [];
-                            let secMaxPoints = points.reduce((a, b) => a + b, 0);
-                            let secPointsScored = 0;
-                            questions.forEach((q, index) => {
-                                const answer = answers[`${sectionId}_${index}`];
-                                let isReadyAnswer = (answer === 'YA');
-                                if (sectionId === 'bahan' && (index === 3 || index === 4)) { isReadyAnswer = (answer === 'TIDAK'); }
-                                if (isReadyAnswer) { secPointsScored += points[index] || 0; }
-                            });
-                            const secPercentage = secMaxPoints > 0 ? (secPointsScored / secMaxPoints) * 100 : 0;
-                            const secTitle = flowSteps.find(s => s.id === sectionId)?.title.replace(/^\d+\.\s*/, '') || sectionId;
-                            const barColor = secPercentage >= 80 ? 'bg-green-500' : secPercentage >= 60 ? 'bg-yellow-500' : 'bg-red-500';
-                            return `
-                                <div class="mb-6 border-b pb-4">
-                                    <h5 class="text-lg font-bold text-gray-800">${secTitle}</h5>
-                                    <div class="flex justify-between items-center mb-1">
-                                        <span class="text-sm font-medium">Skor: ${secPointsScored}/${secMaxPoints}</span>
-                                        <span class="text-lg font-bold">${secPercentage.toFixed(0)}%</span>
-                                    </div>
-                                    <div class="w-full bg-gray-200 rounded-full h-3"><div class="${barColor} h-3 rounded-full" style="width: ${secPercentage.toFixed(0)}%"></div></div>
-                                </div>`;
-                        }).join('')}</div>
-                    <div class="text-xs text-gray-500 text-center pt-4 border-t">&copy; Hak Cipta ACE UniKL MICET 2025.</div>
+                    <div class="mt-8 p-6 rounded-xl shadow-lg border"><h3 class="text-2xl font-bold mb-4 text-center">Ringkasan Keputusan</h3><div class="flex flex-col sm:flex-row items-center justify-around text-center"><div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl mt-1">Ketersediaan</p></div><div><p class="text-5xl font-extrabold">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl mt-1">Mata Halal</p></div></div></div>
+                    <div class="mt-8 text-center p-6 rounded-xl border-4 ${statusColor} shadow-md"><p class="text-2xl font-bold">Status: <span class="text-3xl">${status.toUpperCase()}</span></p><p class="mt-4">${recommendation}</p></div>
+
+                    <!-- Section 2: AI & Business Info -->
+                    <div class="mt-8 p-6 bg-teal-50 rounded-xl shadow-lg border-l-4 border-teal-600"><h4 class="text-xl font-semibold mb-2">Rumusan Analisis AI</h4><p class="text-xs text-gray-500 italic mb-3">*Ringkasan ini dijana oleh AI dan bertujuan sebagai panduan awal sahaja.</p><div class="text-base">${aiSummary}</div></div>
+                    <div class="mt-8 p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Maklumat Perniagaan</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-bold">${['Nama Perniagaan','No SSM (jika ada)','Alamat','No Telefon','Nama Pemilik','Jualan tahunan perniagaan','Bilangan pekerja keseluruhan'].map(f => `<p><strong>${f}:</strong> ${answers[f.toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_')] || '- '}</p>`).join('')}</div></div>
+                    ${clientReview ? `<div class="mt-8 p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Ulasan Klien</h4><p class="text-sm whitespace-pre-wrap">${clientReview}</p></div>` : ''}
+
+                    <!-- Section 3: Pie Chart -->
+                    <div class="mt-8 p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Jawapan</h4><div class="flex justify-center w-full max-w-lg mx-auto"><canvas id="modalReportPieChart" width="400" height="400"></canvas></div></div>
+
+                    <!-- Section 4: Gaps Table -->
+                    <div class="mt-8 p-6 bg-white rounded-xl shadow-lg border-t-4 border-red-500"><h4 class="text-xl font-bold text-red-700 mb-4 border-b pb-2">Jurang Pematuhan Kritikal</h4>${renderGapsTable(answers, scoredSections)}</div>
+
+                    <!-- Section 5: Section Analysis -->
+                    <div class="mt-8 p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Mengikut Bahagian</h4>${scoredSections.map(sId => { const qs = (sId === 'syarat') ? flowSteps.find(s=>s.id===sId).questions : qaQuestions[sId]; const pts = questionPoints[sId] || []; let secMax=0, secScore=0; pts.forEach(p=>{secMax+=p;}); qs.forEach((q,idx) => { const ans = answers[`${sId}_${idx}`]; let isReady= (ans==='YA'); if(sId==='bahan'&& idx===3) isReady=(ans==='TIDAK'); if(isReady) secScore+=pts[idx]; }); const secPerc = secMax > 0 ? (secScore / secMax) * 100 : 0; const secTitle = flowSteps.find(s=>s.id===sId)?.title.replace(/^\d+\.\s*/, '') || sId; const barColor = secPerc >= 80 ? 'bg-green-500' : secPerc >= 60 ? 'bg-yellow-500' : 'bg-red-500'; return `<div class="mb-6 border-b pb-4"><h5 class="text-lg font-bold">${secTitle}</h5><div class="flex justify-between items-center mb-1"><span class="text-sm">Skor: ${secScore}/${secMax}</span><span class="text-lg font-bold">${secPerc.toFixed(0)}%</span></div><div class="w-full bg-gray-200 rounded-full h-3"><div class="${barColor} h-3 rounded-full" style="width: ${secPerc.toFixed(0)}%"></div></div></div>`; }).join('')}</div>
+                    
+                    <!-- Footer -->
+                    <div class="mt-8 text-xs text-gray-500 text-center pt-4 border-t">&copy; Hak Cipta ACE UniKL MICET 2025.</div>
                 </div>`;
         };
 
-        window.printReport = async () => {
-            const modalBody = document.getElementById('modal-report-body');
-            if (!modalBody) return alert("Tiada laporan untuk dicetak.");
-
-            const { client, answers, score } = selectedClientData;
-            modalBody.innerHTML = renderReportContent(client, answers, score);
+        const renderReportCover = () => {
+            if (!selectedClientData || !selectedClientData.answers) return '<div>Ralat: Data klien tidak ditemui untuk muka depan.</div>';
+            const { answers } = selectedClientData;
+            const today = new Date();
+            const formattedDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
             
-            if (score.answerBreakdown.ya + score.answerBreakdown.tidak > 0) {
-                await new Promise((resolve) => {
-                    renderPieChart(score.answerBreakdown, 'modalReportPieChart', resolve);
-                });
+            return `
+            <div id="pdf-cover-page" class="bg-white p-8" style="width: 210mm; height: 297mm; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #eee;">
+                <div>
+                    <h1 class="text-5xl font-extrabold text-gray-800">eHalal<span class="text-teal-600">GAP</span></h1>
+                    <p class="text-lg text-gray-500 mt-2">Platform Analisis Kendiri untuk Pensijilan Halal</p>
+                </div>
+                
+                <div class="text-center">
+                    <h2 class="text-4xl font-bold text-gray-700">Laporan Semakan Jurang Halal</h2>
+                    <div class="mt-12 border-t-2 border-teal-500 w-24 mx-auto"></div>
+                    <p class="mt-8 text-3xl font-semibold">${answers.nama_perniagaan || 'Nama Perniagaan'}</p>
+                    <p class="mt-2 text-lg text-gray-600">${answers.no_ssm__jika_ada_ || 'No. Pendaftaran'}</p>
+                </div>
+                
+                <div class="text-sm text-gray-600">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="font-bold">Disediakan Untuk:</p>
+                            <p>${answers.nama_pemilik || answers.nama_perniagaan}</p>
+                        </div>
+                        <div>
+                            <p class="font-bold">Tarikh Laporan:</p>
+                            <p>${formattedDate}</p>
+                        </div>
+                        <div>
+                            <p class="font-bold">Disediakan Oleh:</p>
+                            <p>Sistem Automasi eHalalGAP</p>
+                        </div>
+                         <div>
+                            <p class="font-bold">ID Laporan:</p>
+                            <p>EHG-${today.getTime()}</p>
+                        </div>
+                    </div>
+                    <p class="mt-8 text-xs text-gray-500 italic">Dokumen ini adalah sulit dan mengandungi maklumat proprietari. Ia dihasilkan untuk kegunaan dalaman penerima sahaja dan tidak boleh disebarkan tanpa kebenaran bertulis.</p>
+                     <p class="text-center mt-4 text-xs">&copy; Hak Cipta ACE UniKL MICET 2025.</p>
+                </div>
+            </div>
+            `;
+        };
+
+        window.downloadReportPDF = async () => {
+            if (!selectedClientData) {
+                alert("Sila pilih dan lihat laporan klien terlebih dahulu sebelum memuat turun.");
+                return;
             }
 
-            await new Promise(r => setTimeout(r, 400));
-            window.print();
+            const downloadButton = document.querySelector('#report-modal button[onclick="window.downloadReportPDF()"]');
+            const originalButtonText = downloadButton.innerHTML;
+            downloadButton.innerHTML = '<span class="animate-pulse">Menjana PDF...</span>';
+            downloadButton.disabled = true;
+
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const margin = 10;
+            
+            // --- 1. Add Cover Page ---
+            const tempCoverContainer = document.createElement('div');
+            tempCoverContainer.style.position = 'absolute';
+            tempCoverContainer.style.left = '-9999px'; // Hide it off-screen
+            tempCoverContainer.innerHTML = renderReportCover();
+            document.body.appendChild(tempCoverContainer);
+            const coverElement = document.getElementById('pdf-cover-page');
+            
+            const coverCanvas = await html2canvas(coverElement, { scale: 2 });
+            const coverImgData = coverCanvas.toDataURL('image/jpeg', 0.98);
+            pdf.addImage(coverImgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+            document.body.removeChild(tempCoverContainer);
+
+            // --- 2. Add Main Report Content ---
+            pdf.addPage();
+            let yPos = margin;
+            
+            const reportElement = document.getElementById('modal-report-body');
+            // The content is already rendered by viewReport, so we just need to re-render the chart without animation
+            const { answers, score } = selectedClientData;
+             if (score.totalAnswered > 0) {
+                const originalAnimation = Chart.defaults.animation;
+                Chart.defaults.animation = false;
+                await new Promise(resolve => renderPieChart(score.answerBreakdown, 'modalReportPieChart', resolve));
+                Chart.defaults.animation = originalAnimation;
+            }
+            await new Promise(r => setTimeout(r, 500));
+
+            const addCanvasToPdf = async (element) => {
+                const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+                const imgData = canvas.toDataURL('image/jpeg', 0.98);
+                const imgWidth = pdfWidth - (margin * 2);
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+                if (yPos + imgHeight + margin > pdfHeight) {
+                    pdf.addPage();
+                    yPos = margin;
+                }
+
+                pdf.addImage(imgData, 'JPEG', margin, yPos, imgWidth, imgHeight);
+                yPos += imgHeight + 5;
+            };
+
+            const sections = reportElement.querySelectorAll('#pdf-content-container > div');
+            for (const section of sections) {
+                await addCanvasToPdf(section);
+            }
+
+            const clientName = answers['nama_perniagaan'] || 'laporan-ehalalgap';
+            const filename = `${clientName.replace(/\s+/g, '_').toLowerCase()}_${new Date().toISOString().slice(0,10)}.pdf`;
+            pdf.save(filename);
+
+            downloadButton.innerHTML = originalButtonText;
+            downloadButton.disabled = false;
         };
 
         window.viewReport = async (userId) => {
@@ -298,10 +351,8 @@
                 const score = calculateScore(answers);
                 selectedClientData = { client, answers, score };
                 
-                // Render the full report structure
                 reportBody.innerHTML = renderReportContent(client, answers, score);
 
-                // Render pie chart inside the now-visible modal
                 setTimeout(() => renderPieChart(score.answerBreakdown, 'modalReportPieChart'), 100);
 
             } catch (error) {
@@ -485,17 +536,16 @@
     <!-- Report Preview Modal -->
     <div id="report-modal" class="modal">
         <div class="modal-content">
-            <div class="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-xl z-10 print-hidden">
+            <div class="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-xl z-10">
                 <h2 class="text-2xl font-bold text-gray-800">Laporan Penuh Klien</h2>
                 <button onclick="window.toggleModal(false)" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
             </div>
             <div id="modal-report-body"></div>
-            <div class="sticky bottom-0 bg-gray-50 border-t p-4 flex justify-center space-x-4 rounded-b-xl z-10 print-hidden">
+            <div class="sticky bottom-0 bg-gray-50 border-t p-4 flex justify-center space-x-4 rounded-b-xl z-10">
                 <button onclick="window.toggleModal(false)" class="btn-secondary px-6 py-2 rounded-xl">Tutup</button>
-                <button onclick="window.printReport()" class="btn-primary text-white px-6 py-2 rounded-xl">Cetak Laporan</button>
+                <button onclick="window.downloadReportPDF()" class="btn-primary text-white px-6 py-2 rounded-xl">Muat Turun PDF</button>
             </div>
         </div>
     </div>
 </body>
 </html>
-

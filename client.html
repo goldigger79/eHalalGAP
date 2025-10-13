@@ -105,54 +105,6 @@
             overflow-y: auto;
             position: relative;
         }
-
-        /* Print-specific styles */
-        @media print {
-             /* Pastikan hanya laporan dicetak */
-            body * {
-                visibility: hidden;
-            }
-            /* FIX: Ensure the modal container itself is also visible */
-            #report-modal,
-            #modal-report-body,
-            #modal-report-body * {
-                visibility: visible;
-            }
-            #report-modal {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                background: white;
-                display: block !important;
-                padding: 0;
-                margin: 0;
-            }
-            .modal-content {
-                box-shadow: none;
-                border: none;
-                width: 100%;
-                max-width: 100%;
-                border-radius: 0;
-            }
-            .print-hidden {
-                display: none !important;
-            }
-            /* Tambah kawalan saiz & scaling A4 */
-            #modal-report-body {
-                width: 210mm;      /* Lebar A4 */
-                min-height: 297mm;    /* Tinggi A4 */
-                margin: 0 auto;
-                padding: 20mm;
-                box-sizing: border-box;
-                transform: scale(0.9);  /* Laraskan jika masih terlalu besar */
-                transform-origin: top center;
-            }
-            @page {
-                size: A4;
-                margin: 10mm; /* margin fizikal cetak */
-            }
-        }
     </style>
     <!-- Firebase SDKs -->
     <script type="module">
@@ -577,62 +529,90 @@
             }
         };
 
-        window.printReport = async () => {
-            const modalBody = document.getElementById('modal-report-body');
-            if (!modalBody) return alert("Tiada laporan untuk dicetak.");
-
-            // Ensure the report is fully rendered
-            modalBody.innerHTML = window.renderReportContent();
+        window.renderReportCover = () => {
+            const answers = window.appState.answers;
+            const today = new Date();
+            const formattedDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
             
-            // Render the chart first
-            const score = window.calculateScore();
-            if (score.totalAnswered > 0) {
-                await new Promise((resolve) => {
-                    window.renderPieChart(score.answerBreakdown, 'modalReportPieChart', resolve);
-                });
-            }
-
-            // Wait a moment for the browser to draw all elements
-            await new Promise(r => setTimeout(r, 400));
-
-            // Now call the print function
-            window.print();
+            return `
+            <div id="pdf-cover-page" class="bg-white p-8" style="width: 210mm; height: 297mm; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #eee;">
+                <div>
+                    <h1 class="text-5xl font-extrabold text-gray-800">eHalal<span class="text-teal-600">GAP</span></h1>
+                    <p class="text-lg text-gray-500 mt-2">Platform Analisis Kendiri untuk Pensijilan Halal</p>
+                </div>
+                
+                <div class="text-center">
+                    <h2 class="text-4xl font-bold text-gray-700">Laporan Semakan Jurang Halal</h2>
+                    <div class="mt-12 border-t-2 border-teal-500 w-24 mx-auto"></div>
+                    <p class="mt-8 text-3xl font-semibold">${answers.nama_perniagaan || 'Nama Perniagaan'}</p>
+                    <p class="mt-2 text-lg text-gray-600">${answers.no_ssm__jika_ada_ || 'No. Pendaftaran'}</p>
+                </div>
+                
+                <div class="text-sm text-gray-600">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="font-bold">Disediakan Untuk:</p>
+                            <p>${answers.nama_pemilik || answers.nama_perniagaan}</p>
+                        </div>
+                        <div>
+                            <p class="font-bold">Tarikh Laporan:</p>
+                            <p>${formattedDate}</p>
+                        </div>
+                        <div>
+                            <p class="font-bold">Disediakan Oleh:</p>
+                            <p>Sistem Automasi eHalalGAP</p>
+                        </div>
+                         <div>
+                            <p class="font-bold">ID Laporan:</p>
+                            <p>EHG-${today.getTime()}</p>
+                        </div>
+                    </div>
+                    <p class="mt-8 text-xs text-gray-500 italic">Dokumen ini adalah sulit dan mengandungi maklumat proprietari. Ia dihasilkan untuk kegunaan dalaman penerima sahaja dan tidak boleh disebarkan tanpa kebenaran bertulis.</p>
+                     <p class="text-center mt-4 text-xs">&copy; Hak Cipta ACE UniKL MICET 2025.</p>
+                </div>
+            </div>
+            `;
         };
 
         window.downloadReportPDF = async () => {
-            const reportElement = document.getElementById('modal-report-body');
-            if (!reportElement) {
-                alert("Ralat: Elemen laporan tidak ditemui untuk dimuat turun.");
-                return;
-            }
-
             const downloadButton = document.querySelector('button[onclick="window.downloadReportPDF()"]');
             const originalButtonText = downloadButton.innerHTML;
             downloadButton.innerHTML = '<span class="animate-pulse">Menjana PDF...</span>';
             downloadButton.disabled = true;
-
-            // Ensure the content is fresh and the chart is rendered
-            reportElement.innerHTML = window.renderReportContent();
-            const score = window.calculateScore();
-            if (score.totalAnswered > 0) {
-                 // Disable animations for clean capture
-                const originalAnimation = Chart.defaults.animation;
-                Chart.defaults.animation = false;
-                await new Promise(resolve => window.renderPieChart(score.answerBreakdown, 'modalReportPieChart', resolve));
-                Chart.defaults.animation = originalAnimation;
-            }
-            
-            await new Promise(r => setTimeout(r, 500)); // Wait for DOM to update
-
-            const clientName = window.appState.answers['nama_perniagaan'] || 'laporan-ehalalgap';
-            const filename = `${clientName.replace(/\s+/g, '_').toLowerCase()}_${new Date().toISOString().slice(0,10)}.pdf`;
 
             const { jsPDF } = window.jspdf;
             const pdf = new jsPDF('p', 'mm', 'a4');
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = pdf.internal.pageSize.getHeight();
             const margin = 10;
+            
+            // --- 1. Add Cover Page ---
+            const tempCoverContainer = document.createElement('div');
+            tempCoverContainer.style.position = 'absolute';
+            tempCoverContainer.style.left = '-9999px'; // Hide it off-screen
+            tempCoverContainer.innerHTML = window.renderReportCover();
+            document.body.appendChild(tempCoverContainer);
+            const coverElement = document.getElementById('pdf-cover-page');
+            
+            const coverCanvas = await html2canvas(coverElement, { scale: 2 });
+            const coverImgData = coverCanvas.toDataURL('image/jpeg', 0.98);
+            pdf.addImage(coverImgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+            document.body.removeChild(tempCoverContainer); // Clean up
+
+            // --- 2. Add Main Report Content ---
+            pdf.addPage();
             let yPos = margin;
+            
+            const reportElement = document.getElementById('modal-report-body');
+            reportElement.innerHTML = window.renderReportContent();
+            const score = window.calculateScore();
+            if (score.totalAnswered > 0) {
+                const originalAnimation = Chart.defaults.animation;
+                Chart.defaults.animation = false;
+                await new Promise(resolve => window.renderPieChart(score.answerBreakdown, 'modalReportPieChart', resolve));
+                Chart.defaults.animation = originalAnimation;
+            }
+            await new Promise(r => setTimeout(r, 500));
 
             const addCanvasToPdf = async (element) => {
                 const canvas = await html2canvas(element, { scale: 2, useCORS: true });
@@ -646,18 +626,18 @@
                 }
 
                 pdf.addImage(imgData, 'JPEG', margin, yPos, imgWidth, imgHeight);
-                yPos += imgHeight + 5; // Add some padding after each section
+                yPos += imgHeight + 5; // Padding
             };
 
             const sections = reportElement.querySelectorAll('#pdf-content-container > div');
-            
             for (const section of sections) {
                 await addCanvasToPdf(section);
             }
 
+            const clientName = window.appState.answers['nama_perniagaan'] || 'laporan-ehalalgap';
+            const filename = `${clientName.replace(/\s+/g, '_').toLowerCase()}_${new Date().toISOString().slice(0,10)}.pdf`;
             pdf.save(filename);
 
-            // Restore button state
             downloadButton.innerHTML = originalButtonText;
             downloadButton.disabled = false;
         };
@@ -913,7 +893,7 @@
                     tabClasses += ` cursor-pointer ${index === currentStepIndex ? 'tab-active bg-teal-50' : 'text-gray-600 hover:bg-gray-100'}`;
                 }
                 return `<button onclick="window.goToStep(${index})" class="${tabClasses}">${step.title.replace(/^\d+\.\s*/, '')}</button>`;
-            }).join('')}</nav><div class="p-6 bg-white rounded-xl shadow-2xl border-t-4 border-teal-500">${window.renderTabContent()}</div><div class="mt-8 flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0"><button onclick="window.changeStep(-1)" ${currentStepIndex === 0 ? 'disabled' : ''} class="w-full sm:w-auto btn-secondary px-6 py-3 rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>Sebelumnya</button><div class="flex flex-col items-center space-y-2 w-full sm:w-auto"><button onclick="window.manualSave()" ${isResultStep ? 'disabled' : ''} id="save-progress-btn" class="w-full sm:w-auto inline-flex items-center justify-center btn-secondary px-6 py-3 rounded-xl font-semibold hover:bg-teal-100 text-teal-700 disabled:opacity-50"><svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>Simpan Kemajuan</button><p id="save-status-message" class="text-xs text-gray-500 opacity-0 transition"></p></div><button onclick="window.changeStep(1)" ${isResultStep ? 'disabled' : ''} class="w-full sm:w-auto btn-primary px-6 py-3 rounded-xl text-white font-semibold disabled:opacity-50 flex items-center justify-center">${nextButtonText}<svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></button></div></div></main><footer class="bg-gray-800 text-white p-4 mt-8"><div class="max-w-6xl mx-auto text-center text-sm"><p>&copy; Hak Cipta ACE UniKL MICET 2025.</p></div></footer></div><div id="report-modal" class="modal"><div class="modal-content"><div class="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-xl z-10 print-hidden"><h2 class="text-2xl font-bold">Preview Laporan Penuh</h2><button onclick="window.toggleModal(false)" class="text-gray-500 hover:text-gray-800"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button></div><div id="modal-report-body"></div><div class="sticky bottom-0 bg-gray-50 border-t p-4 flex justify-center rounded-b-xl z-10 space-x-4 print-hidden"><button onclick="window.toggleModal(false)" class="btn-secondary px-6 py-3 rounded-xl font-semibold">Tutup</button><button onclick="window.printReport()" class="btn-secondary px-6 py-3 rounded-xl font-semibold">Cetak Laporan</button><button onclick="window.downloadReportPDF()" class="btn-primary px-6 py-3 rounded-xl text-white font-semibold">Muat Turun PDF</button></div></div></div>`;
+            }).join('')}</nav><div class="p-6 bg-white rounded-xl shadow-2xl border-t-4 border-teal-500">${window.renderTabContent()}</div><div class="mt-8 flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0"><button onclick="window.changeStep(-1)" ${currentStepIndex === 0 ? 'disabled' : ''} class="w-full sm:w-auto btn-secondary px-6 py-3 rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>Sebelumnya</button><div class="flex flex-col items-center space-y-2 w-full sm:w-auto"><button onclick="window.manualSave()" ${isResultStep ? 'disabled' : ''} id="save-progress-btn" class="w-full sm:w-auto inline-flex items-center justify-center btn-secondary px-6 py-3 rounded-xl font-semibold hover:bg-teal-100 text-teal-700 disabled:opacity-50"><svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>Simpan Kemajuan</button><p id="save-status-message" class="text-xs text-gray-500 opacity-0 transition"></p></div><button onclick="window.changeStep(1)" ${isResultStep ? 'disabled' : ''} class="w-full sm:w-auto btn-primary px-6 py-3 rounded-xl text-white font-semibold disabled:opacity-50 flex items-center justify-center">${nextButtonText}<svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></button></div></div></main><footer class="bg-gray-800 text-white p-4 mt-8"><div class="max-w-6xl mx-auto text-center text-sm"><p>&copy; Hak Cipta ACE UniKL MICET 2025.</p></div></footer></div><div id="report-modal" class="modal"><div class="modal-content"><div class="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-xl z-10 print-hidden"><h2 class="text-2xl font-bold">Preview Laporan Penuh</h2><button onclick="window.toggleModal(false)" class="text-gray-500 hover:text-gray-800"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button></div><div id="modal-report-body"></div><div class="sticky bottom-0 bg-gray-50 border-t p-4 flex justify-center rounded-b-xl z-10 space-x-4 print-hidden"><button onclick="window.toggleModal(false)" class="btn-secondary px-6 py-3 rounded-xl font-semibold">Tutup</button><button onclick="window.downloadReportPDF()" class="btn-primary px-6 py-3 rounded-xl text-white font-semibold">Muat Turun PDF</button></div></div></div>`;
         };
     </script>
 </head>
@@ -926,5 +906,4 @@
     </div>
 </body>
 </html>
-", using the new and improved PDF download function, I would like to create a function to generate a cover for the report, what information do you suggest to put on the cover of the report?
 
