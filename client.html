@@ -11,8 +11,9 @@
     <link rel="manifest" href="https://raw.githubusercontent.com/goldigger79/eHalalGAP/main/site.webmanifest">
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load html2pdf.js for PDF generation -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Libraries for PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <!-- Load Chart.js for visualization -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
@@ -69,7 +70,6 @@
         }
         /* Style for PDF container to ensure clean output */
         #pdf-content-container {
-            padding: 30px;
             background-color: white;
             color: black;
             font-family: 'Inter', sans-serif;
@@ -147,10 +147,6 @@
                 box-sizing: border-box;
                 transform: scale(0.9);  /* Laraskan jika masih terlalu besar */
                 transform-origin: top center;
-            }
-            /* Gaya khas untuk setiap halaman */
-            .page-break {
-                page-break-before: always;
             }
             @page {
                 size: A4;
@@ -603,7 +599,6 @@
             window.print();
         };
 
-        // NEW: Function to download the report as PDF
         window.downloadReportPDF = async () => {
             const reportElement = document.getElementById('modal-report-body');
             if (!reportElement) {
@@ -624,26 +619,57 @@
             }
             
             // Wait for DOM to update
-             await new Promise(r => setTimeout(r, 500));
-
+            await new Promise(r => setTimeout(r, 500));
+            
             const clientName = window.appState.answers['nama_perniagaan'] || 'laporan-ehalalgap';
             const filename = `${clientName.replace(/\s+/g, '_').toLowerCase()}_${new Date().toISOString().slice(0,10)}.pdf`;
-            
-            const opt = {
-                margin: 10,
-                filename: filename,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
 
-            await html2pdf().set(opt).from(reportElement).save();
-            
-            // Restore button state
-            downloadButton.innerHTML = originalButtonText;
-            downloadButton.disabled = false;
+            const { jsPDF } = window.jspdf;
+
+            html2canvas(reportElement.querySelector('#pdf-content-container'), {
+                scale: 2, // Higher scale for better quality
+                useCORS: true
+            }).then(canvas => {
+                const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+                
+                const canvasWidth = canvas.width;
+                const canvasHeight = canvas.height;
+                
+                const ratio = canvasHeight / canvasWidth;
+                
+                const imgWidth = pdfWidth - 20; // 10mm margin on each side
+                const imgHeight = imgWidth * ratio;
+                
+                let heightLeft = imgHeight;
+                let position = 10; // Initial top margin
+
+                pdf.addImage(imgData, 'JPEG', 10, position, imgWidth, imgHeight);
+                heightLeft -= (pdfHeight - 20);
+
+                while (heightLeft > 0) {
+                    position -= (pdfHeight - 20);
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'JPEG', 10, position, imgWidth, imgHeight);
+                    heightLeft -= (pdfHeight - 20);
+                }
+
+                pdf.save(filename);
+
+                // Restore button state
+                downloadButton.innerHTML = originalButtonText;
+                downloadButton.disabled = false;
+            }).catch(err => {
+                console.error("Error generating PDF:", err);
+                alert("Gagal menjana PDF. Sila lihat konsol untuk ralat.");
+                // Restore button state
+                downloadButton.innerHTML = originalButtonText;
+                downloadButton.disabled = false;
+            });
         };
-
 
         window.renderLogin = () => {
             const isRegister = window.appState.isRegisterMode;
@@ -785,7 +811,6 @@
             const progress = score.readinessScore;
             const answers = window.appState.answers;
             const clientIdentifier = answers.nama_perniagaan || (window.auth.currentUser ? window.auth.currentUser.email : window.appState.userId);
-
             const scoredSections = ['syarat', 'premis', 'bahan', 'sanitasi', 'pekerja', 'dokumentasi'];
             let status = '', statusColor = '', recommendation = '';
             if (progress >= 80) { status = 'Bersedia'; statusColor = 'bg-green-100 text-green-700 border-green-500'; recommendation = 'Tahniah! Perniagaan anda menunjukkan ketersediaan tinggi.'; } 
@@ -794,13 +819,33 @@
             const clientReview = answers['ulasan_cabaran_utama'];
             const aiSummary = answers.aiSummary || 'Rumusan AI belum dijana.';
 
-            return `<div id="pdf-content-container" class="p-8 space-y-8 bg-white">
-                <div class="text-center pb-4 border-b">
-                    <h2 class="text-3xl font-extrabold text-gray-800">eHalal<span class="text-teal-600">GAP</span></h2>
-                    <h1 class="text-2xl font-bold text-gray-700 mt-2">Laporan Semakan Jurang Halal</h1>
-                    <p class="text-lg text-gray-500 mt-1">${clientIdentifier}</p>
-                </div>
-                <div class="p-6 rounded-xl shadow-lg border"><h3 class="text-2xl font-bold mb-4 text-center">Ringkasan Keputusan</h3><div class="flex flex-col sm:flex-row items-center justify-around text-center"><div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl mt-1">Ketersediaan</p></div><div><p class="text-5xl font-extrabold">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl mt-1">Mata Halal</p></div></div></div><div class="text-center p-6 rounded-xl border-4 ${statusColor} shadow-md"><p class="text-2xl font-bold">Status: <span class="text-3xl">${status.toUpperCase()}</span></p><p class="mt-4">${recommendation}</p></div><div class="p-6 bg-teal-50 rounded-xl shadow-lg border-l-4 border-teal-600 page-break"><h4 class="text-xl font-semibold mb-2">Rumusan Analisis AI</h4><p class="text-xs text-gray-500 italic mb-3">*Ringkasan ini dijana oleh AI dan bertujuan sebagai panduan awal sahaja.</p><div class="text-base">${aiSummary}</div></div><div class="p-6 bg-gray-50 rounded-xl shadow-sm border page-break"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Maklumat Perniagaan</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-bold">${['Nama Perniagaan','No SSM (jika ada)','Alamat','No Telefon','Nama Pemilik','Jualan tahunan perniagaan','Bilangan pekerja keseluruhan'].map(f => `<p><strong>${f}:</strong> ${answers[f.toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_')] || '- '}</p>`).join('')}</div></div>${clientReview ? `<div class="p-6 bg-gray-50 rounded-xl shadow-sm border page-break"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Ulasan Klien</h4><p class="text-sm whitespace-pre-wrap">${clientReview}</p></div>` : ''}<div class="p-6 bg-white rounded-xl shadow-lg page-break"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Jawapan</h4><div class="flex justify-center w-full max-w-lg mx-auto"><canvas id="modalReportPieChart" width="400" height="400"></canvas></div></div><div class="p-6 bg-white rounded-xl shadow-lg border-t-4 border-red-500 page-break"><h4 class="text-xl font-bold text-red-700 mb-4 border-b pb-2">Jurang Pematuhan Kritikal</h4>${window.renderGapsTable(answers, scoredSections)}</div><div class="p-6 bg-white rounded-xl shadow-lg page-break"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Mengikut Bahagian</h4>${scoredSections.map(sId => { const qs = (sId === 'syarat') ? flowSteps.find(s=>s.id===sId).questions : qaQuestions[sId]; const pts = questionPoints[sId] || []; let secMax=0, secScore=0; pts.forEach(p=>{secMax+=p;}); qs.forEach((q,idx) => { const ans = answers[`${sId}_${idx}`]; let isReady= (ans==='YA'); if(sId==='bahan'&& idx===3) isReady=(ans==='TIDAK'); if(isReady) secScore+=pts[idx]; }); const secPerc = secMax > 0 ? (secScore / secMax) * 100 : 0; const secTitle = flowSteps.find(s=>s.id===sId)?.title.replace(/^\d+\.\s*/, '') || sId; const barColor = secPerc >= 80 ? 'bg-green-500' : secPerc >= 60 ? 'bg-yellow-500' : 'bg-red-500'; return `<div class="mb-6 border-b pb-4"><h5 class="text-lg font-bold">${secTitle}</h5><div class="flex justify-between items-center mb-1"><span class="text-sm">Skor: ${secScore}/${secMax}</span><span class="text-lg font-bold">${secPerc.toFixed(0)}%</span></div><div class="w-full bg-gray-200 rounded-full h-3"><div class="${barColor} h-3 rounded-full" style="width: ${secPerc.toFixed(0)}%"></div></div></div>`; }).join('')}</div><div class="text-xs text-gray-500 text-center pt-4 border-t">&copy; Hak Cipta ACE UniKL MICET 2025.</div></div>`;
+            return `<div id="pdf-content-container" class="bg-white p-8">
+                        <!-- Section 1: Header & Summary -->
+                        <div class="text-center pb-4 border-b">
+                            <h2 class="text-3xl font-extrabold text-gray-800">eHalal<span class="text-teal-600">GAP</span></h2>
+                            <h1 class="text-2xl font-bold text-gray-700 mt-2">Laporan Semakan Jurang Halal</h1>
+                            <p class="text-lg text-gray-500 mt-1">${clientIdentifier}</p>
+                        </div>
+                        <div class="mt-8 p-6 rounded-xl shadow-lg border"><h3 class="text-2xl font-bold mb-4 text-center">Ringkasan Keputusan</h3><div class="flex flex-col sm:flex-row items-center justify-around text-center"><div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl mt-1">Ketersediaan</p></div><div><p class="text-5xl font-extrabold">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl mt-1">Mata Halal</p></div></div></div>
+                        <div class="mt-8 text-center p-6 rounded-xl border-4 ${statusColor} shadow-md"><p class="text-2xl font-bold">Status: <span class="text-3xl">${status.toUpperCase()}</span></p><p class="mt-4">${recommendation}</p></div>
+
+                        <!-- Section 2: AI & Business Info -->
+                        <div class="mt-8 p-6 bg-teal-50 rounded-xl shadow-lg border-l-4 border-teal-600"><h4 class="text-xl font-semibold mb-2">Rumusan Analisis AI</h4><p class="text-xs text-gray-500 italic mb-3">*Ringkasan ini dijana oleh AI dan bertujuan sebagai panduan awal sahaja.</p><div class="text-base">${aiSummary}</div></div>
+                        <div class="mt-8 p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Maklumat Perniagaan</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-bold">${['Nama Perniagaan','No SSM (jika ada)','Alamat','No Telefon','Nama Pemilik','Jualan tahunan perniagaan','Bilangan pekerja keseluruhan'].map(f => `<p><strong>${f}:</strong> ${answers[f.toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_')] || '- '}</p>`).join('')}</div></div>
+                        ${clientReview ? `<div class="mt-8 p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Ulasan Klien</h4><p class="text-sm whitespace-pre-wrap">${clientReview}</p></div>` : ''}
+
+                        <!-- Section 3: Pie Chart -->
+                        <div class="mt-8 p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Jawapan</h4><div class="flex justify-center w-full max-w-lg mx-auto"><canvas id="modalReportPieChart" width="400" height="400"></canvas></div></div>
+
+                        <!-- Section 4: Gaps Table -->
+                        <div class="mt-8 p-6 bg-white rounded-xl shadow-lg border-t-4 border-red-500"><h4 class="text-xl font-bold text-red-700 mb-4 border-b pb-2">Jurang Pematuhan Kritikal</h4>${window.renderGapsTable(answers, scoredSections)}</div>
+
+                        <!-- Section 5: Section Analysis -->
+                        <div class="mt-8 p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Mengikut Bahagian</h4>${scoredSections.map(sId => { const qs = (sId === 'syarat') ? flowSteps.find(s=>s.id===sId).questions : qaQuestions[sId]; const pts = questionPoints[sId] || []; let secMax=0, secScore=0; pts.forEach(p=>{secMax+=p;}); qs.forEach((q,idx) => { const ans = answers[`${sId}_${idx}`]; let isReady= (ans==='YA'); if(sId==='bahan'&& idx===3) isReady=(ans==='TIDAK'); if(isReady) secScore+=pts[idx]; }); const secPerc = secMax > 0 ? (secScore / secMax) * 100 : 0; const secTitle = flowSteps.find(s=>s.id===sId)?.title.replace(/^\d+\.\s*/, '') || sId; const barColor = secPerc >= 80 ? 'bg-green-500' : secPerc >= 60 ? 'bg-yellow-500' : 'bg-red-500'; return `<div class="mb-6 border-b pb-4"><h5 class="text-lg font-bold">${secTitle}</h5><div class="flex justify-between items-center mb-1"><span class="text-sm">Skor: ${secScore}/${secMax}</span><span class="text-lg font-bold">${secPerc.toFixed(0)}%</span></div><div class="w-full bg-gray-200 rounded-full h-3"><div class="${barColor} h-3 rounded-full" style="width: ${secPerc.toFixed(0)}%"></div></div></div>`; }).join('')}</div>
+                        
+                        <!-- Footer -->
+                        <div class="mt-8 text-xs text-gray-500 text-center pt-4 border-t">&copy; Hak Cipta ACE UniKL MICET 2025.</div>
+                    </div>`;
         };
 
         window.handleAnswer = (key, value, shouldRender) => {
@@ -889,3 +934,4 @@
     </div>
 </body>
 </html>
+
