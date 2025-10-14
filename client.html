@@ -395,7 +395,7 @@
         
         window.getGeminiSummary = async (score) => {
             if (!geminiApiKey) {
-                return "Kunci API Gemini tidak sah atau tiada. Sila pastikan ia ditetapkan.";
+                 return "Kunci API Gemini tidak sah atau tiada. Sila pastikan ia ditetapkan.";
             }
 
             const answers = window.appState.answers;
@@ -416,7 +416,7 @@
                 generationConfig: {
                     temperature: 0.5,
                     topP: 1,
-                    maxOutputTokens: 256,
+                    maxOutputTokens: 1024,
                 },
             };
 
