@@ -398,21 +398,10 @@
             if (score.readinessScore >= 80) { status = 'Bersedia'; } 
             else if (score.readinessScore >= 60) { status = 'Kurang Bersedia'; } 
             else { status = 'Tidak Bersedia'; }
-
-            // Construct a simplified prompt
-            let userQuery = `
-                Analisis data penilaian kendiri Halal berikut:
-                - Status Keseluruhan: ${status}
-                - Skor Ketersediaan: ${score.readinessScore.toFixed(0)}%
-                - Jumlah Mata: ${score.totalPointsScored} / ${score.totalQuestions}
-                - Pecahan Jawapan: ${score.answerBreakdown.ya} YA, ${score.answerBreakdown.tidak} TIDAK
-            `;
-            
-            // Add client's challenges if available
+            let userQuery = `Analisis data penilaian kendiri Halal berikut:\n- Status Keseluruhan: ${status}\n- Skor Ketersediaan: ${score.readinessScore.toFixed(0)}%\n- Jumlah Mata: ${score.totalPointsScored} / ${score.totalQuestions}\n- Pecahan Jawapan: ${score.answerBreakdown.ya} YA, ${score.answerBreakdown.tidak} TIDAK`;
             if (answers.ulasan_cabaran_utama) {
                 userQuery += `\n- Cabaran Utama Klien: ${answers.ulasan_cabaran_utama}`;
             }
-
             const systemPrompt = `Anda adalah Juruanalisis Pematuhan Halal. Berdasarkan data berikut, hasilkan ringkasan profesional dalam Bahasa Melayu. Ringkasan perlu merangkumi: 1. Status keseluruhan & skor. 2. Bahagian terkuat (jika ada). 3. Bahagian paling lemah yang memerlukan perhatian segera berdasarkan jawapan "TIDAK". 4. 1-2 nasihat kritikal. Format dalam satu perenggan padat, tanpa tajuk atau senarai.`;
             
             const apiKey = ""; 
@@ -420,26 +409,54 @@
             const payload = {
                 contents: [{ parts: [{ text: userQuery }] }],
                 systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    temperature: 0.5,
+                    topP: 1,
+                    maxOutputTokens: 256,
+                },
             };
-            
+
             try {
-                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
                 if (!response.ok) {
-                    const errorBody = await response.json();
-                    console.error("Gemini API error response:", errorBody);
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    let errorText = `HTTP error! status: ${response.status}`;
+                    try {
+                        const errorBody = await response.json();
+                        console.error("Gemini API error response:", errorBody);
+                        errorText = errorBody.error?.message || errorText;
+                    } catch (e) {
+                        // Ignore if response is not JSON
+                    }
+                    throw new Error(errorText);
                 }
+
                 const result = await response.json();
-                const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (!result.candidates || result.candidates.length === 0) {
+                    console.error("Invalid response from Gemini API: No candidates found.", result);
+                    let reason = result.promptFeedback?.blockReason || 'Tiada kandungan diterima';
+                    return `Gagal menjana ringkasan. Sebab: ${reason}. Sila cuba ubah input anda atau cuba lagi nanti.`;
+                }
+
+                const candidate = result.candidates[0];
+                const text = candidate.content?.parts?.[0]?.text;
+
                 if (text) {
                     return text;
                 } else {
-                    console.error("Invalid response structure from Gemini API:", result);
-                    return "Gagal menjana ringkasan: Tiada kandungan diterima daripada AI.";
+                     console.error("Invalid response structure from Gemini API:", result);
+                     const finishReason = candidate.finishReason || 'STRUKTUR TIDAK SAH';
+                     return `Gagal menjana ringkasan. Sebab: ${finishReason}. Sila cuba lagi.`;
                 }
+
             } catch (error) {
                 console.error("Gemini API fetch error:", error);
-                return "Gagal mendapatkan ringkasan AI akibat ralat teknikal. Sila cuba lagi.";
+                return "Gagal mendapatkan ringkasan AI akibat ralat teknikal. Sila semak sambungan internet anda dan cuba lagi.";
             }
         };
 
