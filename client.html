@@ -129,6 +129,7 @@
         let app = null;
         window.db = null;
         window.auth = null;
+        const geminiApiKey = "AIzaSyAIWAvEdk7BByB-9Y8zYLOD3LIbw1P9Erc";
 
         window.appState = {
             isAuthenticated: false,
@@ -304,7 +305,7 @@
                 errorMessageElement.classList.add('p-3', 'bg-red-100', 'border', 'border-red-400', 'rounded-lg');
             }
         };
-
+        
         window.onload = async () => {
             try {
                 app = initializeApp(firebaseConfig);
@@ -393,6 +394,10 @@
         };
         
         window.getGeminiSummary = async (score) => {
+            if (!geminiApiKey) {
+                return "Kunci API Gemini tidak sah atau tiada. Sila pastikan ia ditetapkan.";
+            }
+
             const answers = window.appState.answers;
             let status = '';
             if (score.readinessScore >= 80) { status = 'Bersedia'; } 
@@ -404,8 +409,7 @@
             }
             const systemPrompt = `Anda adalah Juruanalisis Pematuhan Halal. Berdasarkan data berikut, hasilkan ringkasan profesional dalam Bahasa Melayu. Ringkasan perlu merangkumi: 1. Status keseluruhan & skor. 2. Bahagian terkuat (jika ada). 3. Bahagian paling lemah yang memerlukan perhatian segera berdasarkan jawapan "TIDAK". 4. 1-2 nasihat kritikal. Format dalam satu perenggan padat, tanpa tajuk atau senarai.`;
             
-            const apiKey = ""; 
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${geminiApiKey}`;
             const payload = {
                 contents: [{ parts: [{ text: userQuery }] }],
                 systemInstruction: { parts: [{ text: systemPrompt }] },
@@ -873,21 +877,12 @@
             const isUlasanStep = flowSteps[currentStepIndex].id === 'ulasan';
 
             if (isUlasanStep && direction > 0) {
-                // 1. Immediately navigate to the result page. 
-                //    renderApp will be called inside updateState. 
-                //    It will show the loading text for the AI summary.
                 window.updateState({ currentStep: newStepIndex, assessmentCompleted: true });
-
-                // 2. Generate summary in the background.
                 const score = window.calculateScore();
                 const summary = await getGeminiSummary(score);
-
-                // 3. Update the state again with the summary.
-                //    This will trigger another renderApp to show the summary.
                 window.updateState({
                     answers: { ...window.appState.answers, aiSummary: summary }
                 });
-
             } else if (newStepIndex >= 0 && newStepIndex < flowSteps.length) {
                 window.updateState({ currentStep: newStepIndex });
             }
