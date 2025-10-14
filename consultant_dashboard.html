@@ -27,12 +27,17 @@
         .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 50; overflow-y: auto; padding: 20px; }
         .modal-content { background-color: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 95%; max-width: 1200px; max-height: 95vh; overflow-y: auto; position: relative; }
         .print-hidden { display: none !important; }
+        .tab-active {
+            border-bottom: 2px solid #0d9488;
+            color: #0d9488;
+            font-weight: 600;
+        }
     </style>
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, onSnapshot, collection, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, onSnapshot, collection, query, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const APP_FIREBASE_CONFIG = {
             apiKey: "AIzaSyCll1mrRqrAMAUqzdGqSYSyFBiOpb6y_y4",
@@ -48,6 +53,8 @@
         
         let app, db, auth;
         let selectedClientData = null; // Store data for the selected client
+        let allClients = []; // Store the full list of clients to allow filtering
+        let showArchived = false; // State to toggle between active and archived clients
 
         // --- ALL QUESTIONNAIRE AND SCORING DATA (Copied from client.html) ---
         const flowSteps = [
@@ -408,6 +415,76 @@
             await signOut(auth);
         };
 
+        window.toggleArchiveView = () => {
+            showArchived = !showArchived;
+            const toggleButton = document.getElementById('archive-toggle-btn');
+            if (toggleButton) {
+                toggleButton.textContent = showArchived ? 'Lihat Klien Aktif' : 'Lihat Arkib';
+            }
+            renderClientList();
+        };
+
+        window.archiveClient = async (userId, status) => {
+            const clientDocRef = doc(db, `/artifacts/${appId}/public/data/clients`, userId);
+            try {
+                await updateDoc(clientDocRef, { isArchived: status });
+                // The onSnapshot listener will automatically refresh the list.
+            } catch (error) {
+                console.error("Gagal mengemas kini status arkib klien:", error);
+                alert("Gagal mengarkibkan klien. Sila cuba lagi.");
+            }
+        };
+
+        function renderClientList() {
+            const tableBody = document.getElementById('client-list-body');
+            if (!tableBody) return;
+
+            const filteredClients = allClients.filter(client => showArchived ? client.isArchived === true : client.isArchived !== true);
+            const resultStepIndex = flowSteps.findIndex(step => step.id === 'result');
+
+            if (filteredClients.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="6" class="text-center p-4">${showArchived ? 'Tiada klien diarkibkan.' : 'Tiada klien aktif.'}</td></tr>`;
+                return;
+            }
+
+            tableBody.innerHTML = filteredClients.map(client => {
+                let statusText, statusColor;
+                
+                if (client.currentStepIndex === resultStepIndex) {
+                    statusText = 'Selesai';
+                    statusColor = 'bg-green-100 text-green-800';
+                } else if (client.currentStepIndex > 0) {
+                    statusText = 'Sedang Berjalan';
+                    statusColor = 'bg-yellow-100 text-yellow-800';
+                } else {
+                    statusText = 'Belum Mula';
+                    statusColor = 'bg-gray-100 text-gray-800';
+                }
+
+                const archiveButtonText = showArchived ? 'Nyaharkib' : 'Arkib';
+                const archiveFunctionCall = `window.archiveClient('${client.userId}', ${!showArchived})`;
+                const archiveButtonClass = showArchived ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' : 'bg-gray-100 text-gray-800 hover:bg-gray-200';
+
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-4 font-medium">${client.clientName || 'Client Baru'}</td>
+                        <td class="p-4 text-xs text-gray-600">${client.userId}</td>
+                        <td class="p-4 font-bold text-teal-700">${parseFloat(client.readinessScore).toFixed(0)}%</td>
+                        <td class="p-4">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusColor}">
+                                ${statusText}
+                            </span>
+                        </td>
+                        <td class="p-4 text-sm">${new Date(client.lastUpdated).toLocaleString('ms-MY')}</td>
+                        <td class="p-4 space-x-2">
+                            <button onclick="viewReport('${client.userId}')" class="btn-primary text-white px-3 py-1 rounded-md text-sm">Laporan</button>
+                            <button onclick="${archiveFunctionCall}" class="${archiveButtonClass} px-3 py-1 rounded-md text-sm">${archiveButtonText}</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
         window.onload = () => {
             app = initializeApp(firebaseConfig);
             db = getFirestore(app);
@@ -431,30 +508,14 @@
             const q = query(clientsCollection);
 
             onSnapshot(q, (snapshot) => {
-                const clientList = snapshot.docs.map(doc => doc.data());
-                const tableBody = document.getElementById('client-list-body');
-                const loadingRow = document.getElementById('loading-row');
-                
-                if (clientList.length === 0) {
-                    loadingRow.innerHTML = '<td colspan="5" class="text-center p-4">Tiada klien yang berdaftar lagi.</td>';
-                    return;
-                }
-
-                loadingRow.style.display = 'none';
-                tableBody.innerHTML = clientList.map(client => `
-                    <tr class="hover:bg-gray-50">
-                        <td class="p-4 font-medium">${client.clientName || 'Client Baru'}</td>
-                        <td class="p-4 text-xs text-gray-600">${client.userId}</td>
-                        <td class="p-4 font-bold text-teal-700">${parseFloat(client.readinessScore).toFixed(0)}%</td>
-                        <td class="p-4 text-sm">${new Date(client.lastUpdated).toLocaleString('ms-MY')}</td>
-                        <td class="p-4 space-x-2">
-                            <button onclick="viewReport('${client.userId}')" class="btn-primary text-white px-3 py-1 rounded-md text-sm">Lihat Laporan</button>
-                        </td>
-                    </tr>
-                `).join('');
+                allClients = snapshot.docs.map(doc => doc.data());
+                renderClientList(); 
             }, (error) => {
                 console.error("Gagal memuatkan senarai klien: ", error);
-                 document.getElementById('loading-row').innerHTML = '<td colspan="5" class="text-center p-4 text-red-600">Ralat memuatkan data klien.</td>';
+                const tableBody = document.getElementById('client-list-body');
+                if(tableBody) {
+                    tableBody.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-red-600">Ralat memuatkan data klien.</td></tr>';
+                }
             });
         }
     </script>
@@ -498,7 +559,10 @@
 
         <!-- Main Content -->
         <main class="flex-grow max-w-7xl mx-auto py-8 w-full px-4 sm:px-6 lg:px-8">
-            <h2 class="text-2xl font-bold mb-6 text-gray-800">Senarai Klien Berdaftar</h2>
+             <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Senarai Klien Berdaftar</h2>
+                <button onclick="window.toggleArchiveView()" id="archive-toggle-btn" class="btn-secondary text-sm px-4 py-2 rounded-lg">Lihat Arkib</button>
+            </div>
             
             <div class="bg-white rounded-xl shadow-2xl overflow-hidden">
                 <div class="overflow-x-auto">
@@ -507,14 +571,15 @@
                             <tr>
                                 <th class="p-4 text-left text-xs font-medium text-gray-500 uppercase">Nama Perniagaan</th>
                                 <th class="p-4 text-left text-xs font-medium text-gray-500 uppercase">ID Klien</th>
-                                <th class="p-4 text-left text-xs font-medium text-gray-500 uppercase">Skor Ketersediaan</th>
+                                <th class="p-4 text-left text-xs font-medium text-gray-500 uppercase">Skor</th>
+                                <th class="p-4 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                                 <th class="p-4 text-left text-xs font-medium text-gray-500 uppercase">Terakhir Dikemaskini</th>
                                 <th class="p-4 text-left text-xs font-medium text-gray-500 uppercase">Tindakan</th>
                             </tr>
                         </thead>
                         <tbody id="client-list-body" class="divide-y divide-gray-200">
-                            <tr id="loading-row">
-                                <td colspan="5" class="text-center p-8">
+                            <tr>
+                                <td colspan="6" class="text-center p-8">
                                     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-500 mx-auto"></div>
                                     <p class="mt-2">Memuatkan senarai klien...</p>
                                 </td>
@@ -549,3 +614,4 @@
     </div>
 </body>
 </html>
+
