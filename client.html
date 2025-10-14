@@ -873,15 +873,21 @@
             const isUlasanStep = flowSteps[currentStepIndex].id === 'ulasan';
 
             if (isUlasanStep && direction > 0) {
-                document.getElementById('ai-summary-content').innerHTML = '<p class="animate-pulse text-teal-600">AI sedang menganalisis data...</p>';
+                // 1. Immediately navigate to the result page. 
+                //    renderApp will be called inside updateState. 
+                //    It will show the loading text for the AI summary.
+                window.updateState({ currentStep: newStepIndex, assessmentCompleted: true });
+
+                // 2. Generate summary in the background.
                 const score = window.calculateScore();
                 const summary = await getGeminiSummary(score);
-                await updateStateAndSave({ 
-                    currentStep: newStepIndex, 
-                    assessmentCompleted: true, 
-                    answers: { ...window.appState.answers, aiSummary: summary } 
+
+                // 3. Update the state again with the summary.
+                //    This will trigger another renderApp to show the summary.
+                window.updateState({
+                    answers: { ...window.appState.answers, aiSummary: summary }
                 });
-                window.renderApp();
+
             } else if (newStepIndex >= 0 && newStepIndex < flowSteps.length) {
                 window.updateState({ currentStep: newStepIndex });
             }
