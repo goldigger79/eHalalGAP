@@ -138,7 +138,8 @@
             answers: {},
             isPaidClient: false, 
             isRegisterMode: false,
-            assessmentCompleted: false // NEW: Flag to track if assessment is finalized
+            assessmentCompleted: false,
+            aiSummary: null // For saved AI summary
         };
         
         // UPDATED a new flowSteps
@@ -196,7 +197,6 @@
             }
         };
         
-        // This function only updates the state object and saves to Firestore. It does NOT re-render the UI.
         const updateStateAndSave = async (newState) => {
              window.appState = { ...window.appState, ...newState };
             
@@ -206,11 +206,11 @@
                     const dataToSave = {
                         currentStep: window.appState.currentStep,
                         answers: window.appState.answers,
-                        assessmentCompleted: window.appState.assessmentCompleted
+                        assessmentCompleted: window.appState.assessmentCompleted,
+                        aiSummary: window.appState.aiSummary // Save AI summary
                     };
                     const score = window.calculateScore();
                     
-                    // The saving logic can remain here
                     await setDoc(privateDocRef, dataToSave, { merge: true });
                     await savePublicSummary(window.appState.userId, dataToSave, score);
                     
@@ -220,7 +220,6 @@
             }
         };
 
-        // This function updates state AND re-renders the entire app UI.
         window.updateState = async (newState) => {
             window.appState = { ...window.appState, ...newState };
             window.renderApp(); // Full re-render
@@ -315,13 +314,11 @@
                     if (user) {
                         const userId = user.uid;
                         window.appState = { ...window.appState, isAuthenticated: true, userId: userId, authReady: true };
-                        console.log("Authenticated with user ID:", userId);
                         
                         const publicSummaryRef = getPublicSummaryDocRef(userId);
                         const publicSummarySnap = await getDoc(publicSummaryRef);
 
                         if (!publicSummarySnap.exists()) {
-                            console.log(`Creating initial public summary for new user: ${userId}`);
                             const initialData = { answers: {}, currentStep: 0 };
                             const initialScore = { readinessScore: 0, totalPointsScored: 0 };
                             await savePublicSummary(userId, initialData, initialScore);
@@ -331,7 +328,13 @@
                         onSnapshot(privateDocRef, (docSnap) => {
                             if (docSnap.exists()) {
                                 const data = docSnap.data();
-                                window.appState = { ...window.appState, currentStep: data.currentStep || 0, answers: data.answers || {}, assessmentCompleted: data.assessmentCompleted || false };
+                                window.appState = { 
+                                    ...window.appState, 
+                                    currentStep: data.currentStep || 0, 
+                                    answers: data.answers || {}, 
+                                    assessmentCompleted: data.assessmentCompleted || false,
+                                    aiSummary: data.aiSummary || null
+                                };
                             }
                             window.renderApp();
                         }, (error) => {
@@ -392,6 +395,119 @@
             return { readinessScore: parseFloat(readinessScore.toFixed(2)), totalPointsScored, totalQuestions: MAX_TOTAL_POINTS, totalAnswered, totalScoredQuestions, answerBreakdown: { ya: countYa, tidak: countTidak, notAnswered: totalScoredQuestions - totalAnswered } };
         };
         
+        window.saveAIAnalysis = () => {
+            const summaryContent = document.getElementById('ai-summary-content').innerHTML;
+            const saveBtn = document.getElementById('save-ai-summary-btn');
+            if (summaryContent && saveBtn) {
+                updateStateAndSave({ aiSummary: summaryContent });
+                saveBtn.textContent = '✅ Disimpan';
+                saveBtn.disabled = true;
+            }
+        };
+
+        window.generateAIAnalysis = async () => {
+            const summaryContainer = document.getElementById('ai-summary-container');
+            const summaryContent = document.getElementById('ai-summary-content');
+            const generateBtn = document.getElementById('generate-ai-btn');
+
+            if (!summaryContainer || !summaryContent || !generateBtn) return;
+
+            summaryContainer.style.display = 'block';
+            summaryContent.innerHTML = '<div class="flex items-center justify-center p-4"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div><p class="ml-4 text-indigo-600">AI sedang menganalisis data anda...</p></div>';
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<span class="animate-pulse">Menjana...</span>';
+
+            try {
+                const score = window.calculateScore();
+                const answers = window.appState.answers;
+                const scoredSections = ['syarat', 'premis', 'bahan', 'sanitasi', 'pekerja', 'dokumentasi'];
+                
+                let gapsText = "";
+                const allGaps = [];
+                const flowStepsMap = flowSteps.reduce((map, step) => {
+                    if (step.type === 'qa' || step.type === 'checklist') map[step.id] = step;
+                    return map;
+                }, {});
+                scoredSections.forEach(sectionId => {
+                    const questions = (sectionId === 'syarat') ? flowSteps.find(s => s.id === 'syarat').questions : qaQuestions[sectionId];
+                    const secTitle = flowStepsMap[sectionId]?.title.replace(/^\d+\.\s*/, '') || 'Unknown';
+                    questions.forEach((q, index) => {
+                        const answer = answers[`${sectionId}_${index}`];
+                        let isGap = (sectionId === 'bahan' && index === 3) ? (answer === 'YA') : (answer === 'TIDAK');
+                        if (isGap) { allGaps.push(`- Bahagian ${secTitle}: ${q.replace(/\*/g, '').trim()}`); }
+                    });
+                });
+                gapsText = allGaps.length > 0 ? allGaps.join('\n') : "Tiada jurang kritikal dikesan.";
+
+                const businessInfo = `
+- Nama Perniagaan: ${answers.nama_perniagaan || 'Tidak dinyatakan'}
+- Kategori Industri: ${answers.kategori_0 === 'YA' ? 'Mikro' : answers.kategori_1 === 'YA' ? 'Kecil' : 'Tidak dinyatakan'}
+- Skim Pensijilan Dipilih: ${Object.keys(answers).filter(k => k.startsWith('skim_')).map((k, i) => answers[k] === 'YA' ? flowSteps.find(s => s.id === 'skim').options[i] : null).filter(Boolean).join(', ') || 'Tidak dinyatakan'}
+- Ulasan Klien: ${answers.ulasan_cabaran_utama || 'Tiada ulasan.'}
+                `.trim();
+                
+                const userQuery = `
+Anda adalah seorang perunding Halal profesional yang berpengalaman. Tugas anda adalah untuk menyediakan ringkasan analisis dan cadangan tindakan berdasarkan data semakan kendiri (self-assessment) yang diberikan.
+
+Berikut adalah data daripada klien:
+**1. Maklumat Asas Perniagaan:**
+${businessInfo}
+**2. Ringkasan Skor Ketersediaan Halal:**
+- Peratus Ketersediaan: ${score.readinessScore.toFixed(0)}%
+- Mata Diperolehi: ${score.totalPointsScored} / ${score.totalQuestions}
+- Analisis Jawapan: ${score.answerBreakdown.ya} YA, ${score.answerBreakdown.tidak} TIDAK, ${score.answerBreakdown.notAnswered} Belum Dijawab.
+**3. Senarai Jurang (GAP) Kritikal yang Dikesan (berdasarkan jawapan "TIDAK"):**
+${gapsText}
+
+**Tugasan Anda:**
+Berdasarkan semua data di atas, sila jana satu rumusan analisis dalam format Markdown. Rumusan ini mestilah:
+a. **Profesional dan Membina:** Gunakan nada yang menyokong dan memberi galakan.
+b. **Berstruktur:** Susun dalam tiga bahagian utama: (1) **Analisis Keseluruhan**, (2) **Fokus Utama Penambahbaikan**, dan (3) **Langkah Seterusnya yang Dicadangkan**.
+c. **Spesifik dan Boleh Diambil Tindakan:** Berikan cadangan yang jelas dan praktikal. Kaitkan cadangan terus kepada jurang yang disenaraikan.
+d. **Bahasa Melayu:** Tulis keseluruhan rumusan dalam Bahasa Melayu.
+Sila mulakan rumusan anda.
+                `.trim();
+
+                const apiKey = ""; 
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                const payload = { contents: [{ parts: [{ text: userQuery }] }] };
+                
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    let generatedText = candidate.content.parts[0].text;
+                    generatedText = generatedText
+                        .replace(/### (.*)/g, '<h5 class="text-lg font-bold text-gray-800 mt-4 mb-2">$1</h5>')
+                        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                        .replace(/\* (.*)/g, '<li class="ml-5 list-disc">$1</li>')
+                        .replace(/(\d)\. (.*)/g, '<li class="ml-5" style="list-style-type: decimal;">$2</li>')
+                        .replace(/\n/g, '<br>');
+                    summaryContent.innerHTML = generatedText;
+                    const buttonsContainer = summaryContent.nextElementSibling;
+                    if(buttonsContainer) buttonsContainer.remove(); // Remove old buttons if they exist
+                    
+                    summaryContent.insertAdjacentHTML('afterend', `
+                        <div class="mt-4 text-center space-x-2">
+                           <button id="save-ai-summary-btn" onclick="window.saveAIAnalysis()" class="btn-secondary px-4 py-2 rounded-lg font-semibold">Simpan Rumusan Ini</button>
+                           <button onclick="window.downloadAISummaryPDF(event)" class="btn-primary text-white px-4 py-2 rounded-lg font-semibold">Muat Turun PDF</button>
+                        </div>
+                    `);
+                } else {
+                    throw new Error("Invalid response structure from API.");
+                }
+
+            } catch (error) {
+                console.error("Error generating AI Analysis:", error);
+                summaryContent.innerHTML = '<p class="text-red-600 font-semibold">Maaf, berlaku ralat semasa menjana rumusan. Sila cuba sebentar lagi.</p>';
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = '<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>Jana Semula Analisis AI';
+            }
+        };
+
         window.renderGapsTable = (answers, scoredSections) => {
             let allGaps = [];
             const flowStepsMap = flowSteps.reduce((map, step) => {
@@ -404,14 +520,7 @@
                 const secTitle = flowStepsMap[sectionId]?.title.replace(/^\d+\.\s*/, '') || 'Unknown';
                 questions.forEach((q, index) => {
                     const answer = answers[`${sectionId}_${index}`];
-                    let isGap = false;
-
-                    if (sectionId === 'bahan' && index === 3) { // Inverted GAP logic for 'bahan' question 4
-                        isGap = (answer === 'YA');
-                    } else { // Default GAP logic for 'TIDAK'
-                        isGap = (answer === 'TIDAK');
-                    }
-
+                    let isGap = (sectionId === 'bahan' && index === 3) ? (answer === 'YA') : (answer === 'TIDAK');
                     if (isGap) {
                         allGaps.push({ section: secTitle, question: q.replace(/\*/g, '').trim(), pointValue: points[index] || 0 });
                     }
@@ -423,28 +532,15 @@
 
         window.renderPieChart = (answerBreakdown, canvasTarget, onCompleteCallback = null) => {
             let canvasEl = typeof canvasTarget === 'string' ? document.getElementById(canvasTarget) : canvasTarget;
-
-            if (!canvasEl) {
-                if (onCompleteCallback) onCompleteCallback();
-                return null;
-            }
-            
+            if (!canvasEl) { if (onCompleteCallback) onCompleteCallback(); return null; }
             const existingChart = Chart.getChart(canvasEl);
-            if (existingChart) {
-                existingChart.destroy();
-            }
+            if (existingChart) { existingChart.destroy(); }
             
             return new Chart(canvasEl, {
                 type: 'pie', data: { labels: ['YA (Halal Ready)', 'TIDAK (Perlu Tindakan)', 'Belum Dijawab'], datasets: [{ data: [answerBreakdown.ya, answerBreakdown.tidak, answerBreakdown.notAnswered], backgroundColor: ['#0d9488', '#dc2626', '#e5e7eb'], hoverOffset: 4 }] },
                 options: { 
                     responsive: true, 
-                    animation: {
-                        onComplete: () => {
-                            if (onCompleteCallback) {
-                                onCompleteCallback();
-                            }
-                        }
-                    },
+                    animation: { onComplete: () => { if (onCompleteCallback) onCompleteCallback(); } },
                     plugins: { 
                         legend: { position: 'bottom', labels: { font: { family: 'Inter', size: 14 } } }, 
                         title: { display: true, text: 'Analisis Jawapan Keseluruhan', font: { size: 18, family: 'Inter', weight: 'bold' } } 
@@ -479,42 +575,10 @@
             
             return `
             <div id="pdf-cover-page" class="bg-white p-8" style="width: 210mm; height: 297mm; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #eee;">
-                <div>
-                    <h1 class="text-5xl font-extrabold text-gray-800">eHalal<span class="text-teal-600">GAP</span></h1>
-                    <p class="text-lg text-gray-500 mt-2">Platform Analisis Kendiri untuk Pensijilan Halal</p>
-                </div>
-                
-                <div class="text-center">
-                    <h2 class="text-4xl font-bold text-gray-700">Laporan Semakan Jurang Halal</h2>
-                    <div class="mt-12 border-t-2 border-teal-500 w-24 mx-auto"></div>
-                    <p class="mt-8 text-3xl font-semibold">${answers.nama_perniagaan || 'Nama Perniagaan'}</p>
-                    <p class="mt-2 text-lg text-gray-600">${answers.no_ssm__jika_ada_ || 'No. Pendaftaran'}</p>
-                </div>
-                
-                <div class="text-sm text-gray-600">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <p class="font-bold">Disediakan Untuk:</p>
-                            <p>${answers.nama_pemilik || answers.nama_perniagaan}</p>
-                        </div>
-                        <div>
-                            <p class="font-bold">Tarikh Laporan:</p>
-                            <p>${formattedDate}</p>
-                        </div>
-                        <div>
-                            <p class="font-bold">Disediakan Oleh:</p>
-                            <p>Sistem Automasi eHalalGAP</p>
-                        </div>
-                         <div>
-                            <p class="font-bold">ID Laporan:</p>
-                            <p>EHG-${today.getTime()}</p>
-                        </div>
-                    </div>
-                    <p class="mt-8 text-xs text-gray-500 italic">Dokumen ini adalah sulit dan mengandungi maklumat proprietari. Ia dihasilkan untuk kegunaan dalaman penerima sahaja dan tidak boleh disebarkan tanpa kebenaran bertulis.</p>
-                     <p class="text-center mt-4 text-xs">&copy; Hak Cipta ACE UniKL MICET 2025.</p>
-                </div>
-            </div>
-            `;
+                <div><h1 class="text-5xl font-extrabold text-gray-800">eHalal<span class="text-teal-600">GAP</span></h1><p class="text-lg text-gray-500 mt-2">Platform Analisis Kendiri untuk Pensijilan Halal</p></div>
+                <div class="text-center"><h2 class="text-4xl font-bold text-gray-700">Laporan Semakan Jurang Halal</h2><div class="mt-12 border-t-2 border-teal-500 w-24 mx-auto"></div><p class="mt-8 text-3xl font-semibold">${answers.nama_perniagaan || 'Nama Perniagaan'}</p><p class="mt-2 text-lg text-gray-600">${answers.no_ssm__jika_ada_ || 'No. Pendaftaran'}</p></div>
+                <div class="text-sm text-gray-600"><div class="grid grid-cols-2 gap-4"><div><p class="font-bold">Disediakan Untuk:</p><p>${answers.nama_pemilik || answers.nama_perniagaan}</p></div><div><p class="font-bold">Tarikh Laporan:</p><p>${formattedDate}</p></div><div><p class="font-bold">Disediakan Oleh:</p><p>Sistem Automasi eHalalGAP</p></div><div><p class="font-bold">ID Laporan:</p><p>EHG-${today.getTime()}</p></div></div><p class="mt-8 text-xs text-gray-500 italic">Dokumen ini adalah sulit dan mengandungi maklumat proprietari. Ia dihasilkan untuk kegunaan dalaman penerima sahaja dan tidak boleh disebarkan tanpa kebenaran bertulis.</p><p class="text-center mt-4 text-xs">&copy; Hak Cipta ACE UniKL MICET 2025.</p></div>
+            </div>`;
         };
 
         window.downloadReportPDF = async () => {
@@ -527,12 +591,11 @@
             const pdf = new jsPDF('p', 'mm', 'a4');
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = pdf.internal.pageSize.getHeight();
-            const margin = 10;
             
             // --- 1. Add Cover Page ---
             const tempCoverContainer = document.createElement('div');
             tempCoverContainer.style.position = 'absolute';
-            tempCoverContainer.style.left = '-9999px'; // Hide it off-screen
+            tempCoverContainer.style.left = '-9999px';
             tempCoverContainer.innerHTML = window.renderReportCover();
             document.body.appendChild(tempCoverContainer);
             const coverElement = document.getElementById('pdf-cover-page');
@@ -540,14 +603,14 @@
             const coverCanvas = await html2canvas(coverElement, { scale: 2 });
             const coverImgData = coverCanvas.toDataURL('image/jpeg', 0.98);
             pdf.addImage(coverImgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-            document.body.removeChild(tempCoverContainer); // Clean up
+            document.body.removeChild(tempCoverContainer);
 
-            // --- 2. Add Main Report Content ---
+            // --- 2. Add Main Report Content (with robust pagination) ---
             pdf.addPage();
-            let yPos = margin;
             
             const reportElement = document.getElementById('modal-report-body');
             reportElement.innerHTML = window.renderReportContent();
+            
             const score = window.calculateScore();
             if (score.totalAnswered > 0) {
                 const originalAnimation = Chart.defaults.animation;
@@ -555,36 +618,113 @@
                 await new Promise(resolve => window.renderPieChart(score.answerBreakdown, 'modalReportPieChart', resolve));
                 Chart.defaults.animation = originalAnimation;
             }
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => setTimeout(r, 500)); // Delay for rendering
 
-            const addCanvasToPdf = async (element) => {
-                const canvas = await html2canvas(element, { scale: 2, useCORS: true });
-                const imgData = canvas.toDataURL('image/jpeg', 0.98);
-                const imgWidth = pdfWidth - (margin * 2);
-                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            const contentToCapture = reportElement.querySelector('#pdf-content-container');
+            const canvas = await html2canvas(contentToCapture, {
+                scale: 2,
+                useCORS: true,
+                width: contentToCapture.scrollWidth,
+                height: contentToCapture.scrollHeight,
+                windowWidth: contentToCapture.scrollWidth,
+                windowHeight: contentToCapture.scrollHeight
+            });
 
-                if (yPos + imgHeight + margin > pdfHeight) {
-                    pdf.addPage();
-                    yPos = margin;
-                }
+            const imgWidth = pdfWidth;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            let heightLeft = imgHeight;
+            let position = 0;
 
-                pdf.addImage(imgData, 'JPEG', margin, yPos, imgWidth, imgHeight);
-                yPos += imgHeight + 5; // Padding
-            };
+            pdf.addImage(canvas, 'JPEG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pdfHeight;
 
-            const sections = reportElement.querySelectorAll('#pdf-content-container > div');
-            for (const section of sections) {
-                await addCanvasToPdf(section);
+            while (heightLeft > 0) {
+                position -= pdfHeight;
+                pdf.addPage();
+                pdf.addImage(canvas, 'JPEG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pdfHeight;
             }
 
             const clientName = window.appState.answers['nama_perniagaan'] || 'laporan-ehalalgap';
-            const filename = `${clientName.replace(/\s+/g, '_').toLowerCase()}_${new Date().toISOString().slice(0,10)}.pdf`;
-            pdf.save(filename);
-
+            pdf.save(`${clientName.replace(/\s+/g, '_').toLowerCase()}_${new Date().toISOString().slice(0,10)}.pdf`);
             downloadButton.innerHTML = originalButtonText;
             downloadButton.disabled = false;
         };
+        
+        window.downloadAISummaryPDF = async (event) => {
+            const downloadButton = event.target;
+            const originalButtonText = downloadButton.innerHTML;
+            downloadButton.innerHTML = '<span class="animate-pulse">Menjana...</span>';
+            downloadButton.disabled = true;
 
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            
+            const clientName = window.appState.answers['nama_perniagaan'] || 'Klien eHalalGAP';
+
+            // --- Create a temporary container for PDF rendering ---
+            const tempContainer = document.createElement('div');
+            tempContainer.style.position = 'absolute';
+            tempContainer.style.left = '-9999px'; // Hide off-screen
+            tempContainer.style.width = '210mm'; // A4 width
+            tempContainer.style.padding = '20px';
+            tempContainer.style.backgroundColor = 'white';
+            tempContainer.style.color = 'black';
+            tempContainer.style.fontFamily = "'Inter', sans-serif";
+            
+            const summaryContent = document.getElementById('ai-summary-content').innerHTML;
+
+            tempContainer.innerHTML = `
+                <div style="text-align: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 20px;">
+                    <h1 style="font-size: 24px; font-weight: bold; color: #1a4f78;">Rumusan Analisis AI</h1>
+                    <p style="font-size: 16px; color: #555;">${clientName}</p>
+                </div>
+                <div>${summaryContent}</div>
+                <div style="text-align: center; border-top: 1px solid #eee; padding-top: 10px; margin-top: 20px; font-size: 10px; color: #888;">
+                    &copy; Hak Cipta ACE UniKL MICET 2025. Laporan dijana oleh eHalalGAP.
+                </div>
+            `;
+            document.body.appendChild(tempContainer);
+
+            try {
+                const canvas = await html2canvas(tempContainer, {
+                    scale: 2,
+                    useCORS: true,
+                    width: tempContainer.scrollWidth,
+                    height: tempContainer.scrollHeight,
+                    windowWidth: tempContainer.scrollWidth,
+                    windowHeight: tempContainer.scrollHeight
+                });
+
+                const imgWidth = pdfWidth;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                let heightLeft = imgHeight;
+                let position = 0;
+
+                pdf.addImage(canvas, 'JPEG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pdfHeight;
+
+                while (heightLeft > 0) {
+                    position -= pdfHeight;
+                    pdf.addPage();
+                    pdf.addImage(canvas, 'JPEG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pdfHeight;
+                }
+
+                const filename = `Rumusan_AI_${clientName.replace(/\s+/g, '_').toLowerCase()}.pdf`;
+                pdf.save(filename);
+
+            } catch (error) {
+                console.error("Error generating AI Summary PDF:", error);
+                alert("Gagal menjana PDF rumusan AI. Sila cuba lagi.");
+            } finally {
+                document.body.removeChild(tempContainer); // Clean up
+                downloadButton.innerHTML = "Muat Turun PDF";
+                downloadButton.disabled = false;
+            }
+        };
 
         window.renderLogin = () => {
             const isRegister = window.appState.isRegisterMode;
@@ -595,107 +735,61 @@
             const progressAnswered = (score.totalScoredQuestions > 0 ? (score.totalAnswered / score.totalScoredQuestions) * 100 : 0).toFixed(0);
             return `<div class="mb-8 p-6 bg-white rounded-xl shadow-lg border-l-4 border-teal-500"><h3 class="text-xl font-semibold mb-4 text-gray-800">Kemajuan Penilaian</h3><div class="bg-blue-50 border-l-4 border-blue-400 text-blue-700 p-4 mb-6 rounded-lg" role="alert"><p class="font-bold">Nota Penting:</p><p class="text-sm">Sila jawab semua soalan dengan jujur. Penilaian ini bertujuan untuk mengenal pasti jurang (GAP) sebenar perniagaan anda.</p></div><div class="flex flex-col items-center justify-center"><div class="flex flex-col items-center"><div class="progress-ring" style="--progress: ${progressAnswered}%;"><div class="progress-ring-inner">${progressAnswered}%</div></div><p class="mt-4 text-lg font-medium">Soalan Dijawab</p><p class="mt-1 text-sm text-gray-500">(${score.totalAnswered} dari ${score.totalScoredQuestions} soalan)</p></div></div></div>`;
         };
-
+        
         window.renderTabContent = () => {
             const step = flowSteps[window.appState.currentStep];
             const currentAnswers = window.appState.answers;
             let html = `<h2 class="text-2xl font-bold mb-2">${step.title}</h2><p class="text-md text-gray-600 mb-6">${step.description}</p>`;
             
-            if (step.id === 'syarat') {
-                html += '<div class="space-y-6">';
-                step.questions.forEach((question, index) => {
-                    const id = `${step.id}_${index}`;
-                    const answer = currentAnswers[id] || '';
-                    let options = ['YA', 'TIDAK'];
-                    if (index === 3 || index === 4) {
-                        options.push('Tidak Berkenaan');
-                    }
-                    html += `<div class="bg-white p-5 rounded-xl shadow-lg border-t-4 border-teal-500/50"><p class="font-medium mb-3">${index + 1}. ${question}</p><div class="flex flex-wrap gap-3">${options.map(option => `<button onclick="window.handleAnswer('${id}', '${option}', true)" class="px-5 py-2 rounded-full text-sm font-semibold transition ${answer === option ? 'bg-teal-600 text-white shadow-md' : 'bg-gray-100 hover:bg-teal-100'}">${option}</button>`).join('')}</div></div>`;
-                });
-                html += '</div>';
-
-                // Add footnotes for FoSIM and NPRA
-                html += `
-                    <div class="mt-8 pt-4 border-t border-gray-200 text-sm text-gray-600 space-y-2">
-                        <p><strong>* FoSIM:</strong> (Food Safety Information System of Malaysia) - Sistem pendaftaran premis makanan online di bawah Kementerian Kesihatan Malaysia (KKM).</p>
-                        <p><strong>* NPRA:</strong> (National Pharmaceutical Regulatory Agency) - Agensi Regulatori Farmasi Negara, bertanggungjawab untuk pendaftaran produk kosmetik dan farmaseutikal di Malaysia.</p>
-                    </div>
-                `;
-            }
-            else if (step.type === 'checklist' || step.type === 'qa') {
-                const questions = step.type === 'checklist' ? step.questions : qaQuestions[step.id];
+            if (step.id === 'syarat' || step.type === 'checklist' || step.type === 'qa') {
+                const questions = step.id === 'syarat' ? step.questions : qaQuestions[step.id];
                 html += '<div class="space-y-6">';
                 questions.forEach((question, index) => {
                     const id = `${step.id}_${index}`;
                     const answer = currentAnswers[id] || '';
                     let options = ['YA', 'TIDAK'];
-                    if (step.id === 'bahan' && index === 1) {
+                    if ((step.id === 'syarat' && (index === 3 || index === 4)) || (step.id === 'bahan' && index === 1)) {
                         options.push('Tidak Berkenaan');
                     }
                     html += `<div class="bg-white p-5 rounded-xl shadow-lg border-t-4 border-teal-500/50"><p class="font-medium mb-3">${index + 1}. ${question}</p><div class="flex flex-wrap gap-3">${options.map(option => `<button onclick="window.handleAnswer('${id}', '${option}', true)" class="px-5 py-2 rounded-full text-sm font-semibold transition ${answer === option ? 'bg-teal-600 text-white shadow-md' : 'bg-gray-100 hover:bg-teal-100'}">${option}</button>`).join('')}</div></div>`;
                 });
                 html += '</div>';
+                if (step.id === 'syarat') {
+                    html += `<div class="mt-8 pt-4 border-t border-gray-200 text-sm text-gray-600 space-y-2"><p><strong>* FoSIM:</strong> (Food Safety Information System of Malaysia) - Sistem pendaftaran premis makanan online di bawah KKM.</p><p><strong>* NPRA:</strong> (National Pharmaceutical Regulatory Agency) - Agensi Regulatori Farmasi Negara, untuk pendaftaran produk kosmetik/farmaseutikal.</p></div>`;
+                }
             } else if (step.type === 'selection') {
                  html += '<div class="space-y-4">';
                 step.options.forEach((question, index) => {
                     const id = `${step.id}_${index}`;
-                    const isChecked = currentAnswers[id] === 'YA';
-
-                    let isDisabled = false;
-                    let labelClasses = "flex items-start p-4 bg-white rounded-xl shadow-sm hover:shadow-md cursor-pointer transition duration-150 w-full";
-                    let inputAttributes = `type="radio" name="${step.id}" id="${id}" value="YA" ${isChecked ? 'checked' : ''} onchange="window.handleAnswer('${id}', 'YA', true)" class="mt-1 h-5 w-5 text-teal-600 border-gray-300 rounded focus:ring-2 focus:ring-teal-500 flex-shrink-0"`;
-                    let spanClasses = "ml-3 text-gray-700";
-                    let disabledText = '';
-                    
-                    if (step.id === 'kategori' && (index === 2 || index === 3)) {
-                        isDisabled = true;
-                        labelClasses = "flex items-start p-4 bg-gray-100 rounded-xl shadow-sm cursor-not-allowed transition duration-150 w-full opacity-60";
-                        inputAttributes = `type="radio" name="${step.id}" id="${id}" value="YA" disabled class="mt-1 h-5 w-5 text-gray-400 border-gray-300 rounded flex-shrink-0"`;
-                        spanClasses = "ml-3 text-gray-500";
-                        disabledText = '<span class="ml-2 text-xs font-semibold text-gray-500">(Tidak Aktif)</span>';
-                    }
-                    
-                    if (step.id === 'skim' && ![0, 1, 3, 4].includes(index)) { // If index is NOT 0, 1, 3, or 4
-                         isDisabled = true;
-                        labelClasses = "flex items-start p-4 bg-gray-100 rounded-xl shadow-sm cursor-not-allowed transition duration-150 w-full opacity-60";
-                        inputAttributes = `type="radio" name="${step.id}" id="${id}" value="YA" disabled class="mt-1 h-5 w-5 text-gray-400 border-gray-300 rounded flex-shrink-0"`;
-                        spanClasses = "ml-3 text-gray-500";
-                        disabledText = '<span class="ml-2 text-xs font-semibold text-gray-500">(Akan Datang)</span>';
-                    }
-
-
-                    html += `
-                        <label for="${id}" class="${labelClasses}">
-                            <input ${inputAttributes}>
-                            <span class="${spanClasses}">${question}${disabledText}</span>
-                        </label>
-                    `;
+                    let isDisabled = (step.id === 'kategori' && (index === 2 || index === 3)) || (step.id === 'skim' && ![0, 1, 3, 4].includes(index));
+                    const labelClasses = `flex items-start p-4 rounded-xl shadow-sm transition duration-150 w-full ${isDisabled ? 'bg-gray-100 cursor-not-allowed opacity-60' : 'bg-white hover:shadow-md cursor-pointer'}`;
+                    const inputAttributes = `type="radio" name="${step.id}" id="${id}" value="YA" ${currentAnswers[id] === 'YA' ? 'checked' : ''} onchange="window.handleAnswer('${id}', 'YA', true)" class="mt-1 h-5 w-5 ${isDisabled ? 'text-gray-400' : 'text-teal-600'} border-gray-300 rounded focus:ring-2 focus:ring-teal-500 flex-shrink-0" ${isDisabled ? 'disabled' : ''}`;
+                    const spanClasses = `ml-3 ${isDisabled ? 'text-gray-500' : 'text-gray-700'}`;
+                    const disabledText = isDisabled ? `<span class="ml-2 text-xs font-semibold text-gray-500">${step.id === 'kategori' ? '(Tidak Aktif)' : '(Akan Datang)'}</span>` : '';
+                    html += `<label for="${id}" class="${labelClasses}"><input ${inputAttributes}><span class="${spanClasses}">${question}${disabledText}</span></label>`;
                 });
                 html += '</div>';
             } else if (step.type === 'form') {
                 const fields = ['Nama Perniagaan', 'No SSM (jika ada)', 'Alamat', 'No Telefon', 'Nama Pemilik', 'Jualan tahunan perniagaan', 'Bilangan pekerja keseluruhan'];
-                const mandatoryFields = ['Nama Perniagaan', 'No SSM (jika ada)', 'Alamat', 'No Telefon'];
                 html += '<div class="space-y-6 bg-white p-6 rounded-xl shadow-lg">';
                 fields.forEach(field => {
                     const id = field.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_');
-                    const value = currentAnswers[id] || '';
-                    const isNumber = field.includes('Jualan') || field.includes('Bilangan');
-                    html += `<div><label for="${id}" class="block text-sm font-medium mb-1">${field} ${mandatoryFields.includes(field) ? '<span class="text-red-500">*</span>' : ''}</label><input type="${isNumber ? 'number' : 'text'}" id="${id}" value="${value}" onchange="window.handleAnswer('${id}', this.value, false)" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="${field}"></div>`;
+                    html += `<div><label for="${id}" class="block text-sm font-medium mb-1">${field} ${['Nama Perniagaan', 'No SSM (jika ada)', 'Alamat', 'No Telefon'].includes(field) ? '<span class="text-red-500">*</span>' : ''}</label><input type="${field.includes('Jualan') || field.includes('Bilangan') ? 'number' : 'text'}" id="${id}" value="${currentAnswers[id] || ''}" onchange="window.handleAnswer('${id}', this.value, false)" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="${field}"></div>`;
                 });
                 html += '</div>';
             } else if (step.type === 'textarea') {
-                const id = 'ulasan_cabaran_utama';
-                const value = currentAnswers[id] || '';
-                html += `<div class="bg-white p-6 rounded-xl shadow-lg"><div><label for="${id}" class="block text-base font-medium mb-3">Apakah cabaran utama yang tuan/puan hadapi dalam memenuhi keperluan halal?</label><textarea id="${id}" onchange="window.handleAnswer('${id}', this.value, false)" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500" rows="10" placeholder="Sila nyatakan cabaran anda...">${value}</textarea></div></div>`;
+                html += `<div class="bg-white p-6 rounded-xl shadow-lg"><div><label for="ulasan_cabaran_utama" class="block text-base font-medium mb-3">Apakah cabaran utama yang tuan/puan hadapi?</label><textarea id="ulasan_cabaran_utama" onchange="window.handleAnswer('ulasan_cabaran_utama', this.value, false)" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500" rows="10" placeholder="Sila nyatakan cabaran anda...">${currentAnswers['ulasan_cabaran_utama'] || ''}</textarea></div></div>`;
             } else if (step.type === 'result') {
                 const score = window.calculateScore();
+                const savedAISummary = window.appState.aiSummary;
+                const aiButtonText = savedAISummary ? 'Jana Semula Analisis AI' : 'Jana Rumusan Analisis AI';
+                const aiContainerDisplay = savedAISummary ? 'block' : 'none';
+
                 html += window.renderReportSummary(score);
-                html += `<div class="mt-8 flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4"><button onclick="window.toggleModal(true)" class="btn-primary text-white px-8 py-4 rounded-xl font-semibold shadow-lg hover:shadow-xl inline-flex items-center">Preview Laporan Penuh</button></div><div class="mt-8 pt-4 border-t"><p class="text-xs text-gray-500 italic font-semibold">Notis Penafian:</p><p class="text-xs mt-1">Laporan ini disediakan berdasarkan penilaian kendiri. Ia hanyalah untuk rujukan dan tidak boleh dianggap sebagai bukti rasmi.</p></div>`;
-                setTimeout(() => {
-                    if (score.totalAnswered > 0) {
-                        window.renderPieChart(score.answerBreakdown, 'reportPieChart');
-                    }
-                }, 100);
+                html += `<div class="mt-8 flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-4"><button onclick="window.toggleModal(true)" class="btn-primary text-white px-8 py-4 rounded-xl font-semibold shadow-lg hover:shadow-xl inline-flex items-center justify-center w-full sm:w-auto"><svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>Preview Laporan Penuh</button><button id="generate-ai-btn" onclick="window.generateAIAnalysis()" class="bg-indigo-600 text-white px-8 py-4 rounded-xl font-semibold shadow-lg hover:bg-indigo-700 transition inline-flex items-center justify-center w-full sm:w-auto"><svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>${aiButtonText}</button></div>`;
+                html += `<div id="ai-summary-container" class="mt-10 p-6 bg-gray-50 rounded-xl shadow-inner border border-gray-200" style="display: ${aiContainerDisplay};"><h4 class="text-xl font-bold text-indigo-800 mb-4 border-b pb-2 flex items-center"><svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>Rumusan Analisis AI</h4><div id="ai-summary-content" class="text-gray-700 space-y-3 leading-relaxed">${savedAISummary || ''}</div>${savedAISummary ? `<div class="mt-4 text-center space-x-2"><button id="save-ai-summary-btn" class="btn-secondary px-4 py-2 rounded-lg font-semibold" disabled>✅ Disimpan</button><button onclick="window.downloadAISummaryPDF(event)" class="btn-primary text-white px-4 py-2 rounded-lg font-semibold">Muat Turun PDF</button></div>` : ''}</div>`;
+                html += `<div class="mt-8 pt-4 border-t"><p class="text-xs text-gray-500 italic font-semibold">Notis Penafian:</p><p class="text-xs mt-1">Laporan ini disediakan berdasarkan penilaian kendiri. Ia hanyalah untuk rujukan dan tidak boleh dianggap sebagai bukti rasmi. Rumusan AI adalah cadangan am dan mungkin tidak merangkumi semua aspek.</p></div>`;
+                setTimeout(() => { if (score.totalAnswered > 0) window.renderPieChart(score.answerBreakdown, 'reportPieChart'); }, 100);
             }
             return html;
         };
@@ -722,32 +816,27 @@
             else { status = 'Tidak Bersedia'; statusColor = 'bg-red-100 text-red-700 border-red-500'; recommendation = 'Perniagaan anda memerlukan penambahbaikan signifikan.'; }
             const clientReview = answers['ulasan_cabaran_utama'];
             
-            return `<div id="pdf-content-container" class="bg-white p-8">
+            let reportHTML = `<div id="pdf-content-container" class="bg-white p-8">
                         <!-- Section 1: Header & Summary -->
-                        <div class="text-center pb-4 border-b">
-                            <h2 class="text-3xl font-extrabold text-gray-800">eHalal<span class="text-teal-600">GAP</span></h2>
-                            <h1 class="text-2xl font-bold text-gray-700 mt-2">Laporan Semakan Jurang Halal</h1>
-                            <p class="text-lg text-gray-500 mt-1">${clientIdentifier}</p>
-                        </div>
+                        <div class="text-center pb-4 border-b"><h2 class="text-3xl font-extrabold text-gray-800">eHalal<span class="text-teal-600">GAP</span></h2><h1 class="text-2xl font-bold text-gray-700 mt-2">Laporan Semakan Jurang Halal</h1><p class="text-lg text-gray-500 mt-1">${clientIdentifier}</p></div>
                         <div class="mt-8 p-6 rounded-xl shadow-lg border"><h3 class="text-2xl font-bold mb-4 text-center">Ringkasan Keputusan</h3><div class="flex flex-col sm:flex-row items-center justify-around text-center"><div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl mt-1">Ketersediaan</p></div><div><p class="text-5xl font-extrabold">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl mt-1">Mata Halal</p></div></div></div>
                         <div class="mt-8 text-center p-6 rounded-xl border-4 ${statusColor} shadow-md"><p class="text-2xl font-bold">Status: <span class="text-3xl">${status.toUpperCase()}</span></p><p class="mt-4">${recommendation}</p></div>
-
                         <!-- Section 2: Business Info -->
                         <div class="mt-8 p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Maklumat Perniagaan</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-bold">${['Nama Perniagaan','No SSM (jika ada)','Alamat','No Telefon','Nama Pemilik','Jualan tahunan perniagaan','Bilangan pekerja keseluruhan'].map(f => `<p><strong>${f}:</strong> ${answers[f.toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_')] || '- '}</p>`).join('')}</div></div>
                         ${clientReview ? `<div class="mt-8 p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Ulasan Klien</h4><p class="text-sm whitespace-pre-wrap">${clientReview}</p></div>` : ''}
-
                         <!-- Section 3: Pie Chart -->
                         <div class="mt-8 p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Jawapan</h4><div class="flex justify-center w-full max-w-lg mx-auto"><canvas id="modalReportPieChart" width="400" height="400"></canvas></div></div>
-
                         <!-- Section 4: Gaps Table -->
                         <div class="mt-8 p-6 bg-white rounded-xl shadow-lg border-t-4 border-red-500"><h4 class="text-xl font-bold text-red-700 mb-4 border-b pb-2">Jurang Pematuhan Kritikal</h4>${window.renderGapsTable(answers, scoredSections)}</div>
-
                         <!-- Section 5: Section Analysis -->
                         <div class="mt-8 p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Mengikut Bahagian</h4>${scoredSections.map(sId => { const qs = (sId === 'syarat') ? flowSteps.find(s=>s.id===sId).questions : qaQuestions[sId]; const pts = questionPoints[sId] || []; let secMax=0, secScore=0; pts.forEach(p=>{secMax+=p;}); qs.forEach((q,idx) => { const ans = answers[`${sId}_${idx}`]; let isReady= (ans==='YA'); if(sId==='bahan'&& idx===3) isReady=(ans==='TIDAK'); if(isReady) secScore+=pts[idx]; }); const secPerc = secMax > 0 ? (secScore / secMax) * 100 : 0; const secTitle = flowSteps.find(s=>s.id===sId)?.title.replace(/^\d+\.\s*/, '') || sId; const barColor = secPerc >= 80 ? 'bg-green-500' : secPerc >= 60 ? 'bg-yellow-500' : 'bg-red-500'; return `<div class="mb-6 border-b pb-4"><h5 class="text-lg font-bold">${secTitle}</h5><div class="flex justify-between items-center mb-1"><span class="text-sm">Skor: ${secScore}/${secMax}</span><span class="text-lg font-bold">${secPerc.toFixed(0)}%</span></div><div class="w-full bg-gray-200 rounded-full h-3"><div class="${barColor} h-3 rounded-full" style="width: ${secPerc.toFixed(0)}%"></div></div></div>`; }).join('')}</div>
-                        
+            `;
+
+            reportHTML += `
                         <!-- Footer -->
                         <div class="mt-8 text-xs text-gray-500 text-center pt-4 border-t">&copy; Hak Cipta ACE UniKL MICET 2025.</div>
                     </div>`;
+            return reportHTML;
         };
 
         window.handleAnswer = (key, value, shouldRender) => {
@@ -760,32 +849,19 @@
                     if (id !== key && newAnswers[id] === 'YA') delete newAnswers[id];
                 });
             }
-            
-            if (shouldRender) {
-                window.updateState({ answers: newAnswers });
-            } else {
-                updateStateAndSave({ answers: newAnswers });
-            }
+            if (shouldRender) window.updateState({ answers: newAnswers });
+            else updateStateAndSave({ answers: newAnswers });
         };
 
         window.goToStep = (index) => {
             const resultStepIndex = flowSteps.findIndex(step => step.id === 'result');
-            if (index === resultStepIndex && !window.appState.assessmentCompleted) {
-                console.log("Sila lengkapkan penilaian sebelum melihat laporan.");
-                return; 
-            }
-
-            if (index >= 0 && index < flowSteps.length) {
-                window.updateState({ currentStep: index });
-            }
+            if (index === resultStepIndex && !window.appState.assessmentCompleted) return; 
+            if (index >= 0 && index < flowSteps.length) window.updateState({ currentStep: index });
         };
 
         window.changeStep = async (direction) => {
-            const currentStepIndex = window.appState.currentStep;
-            const newStepIndex = currentStepIndex + direction;
-            const isUlasanStep = flowSteps[currentStepIndex].id === 'ulasan';
-
-            if (isUlasanStep && direction > 0) {
+            const newStepIndex = window.appState.currentStep + direction;
+            if (flowSteps[window.appState.currentStep].id === 'ulasan' && direction > 0) {
                 window.updateState({ currentStep: newStepIndex, assessmentCompleted: true });
             } else if (newStepIndex >= 0 && newStepIndex < flowSteps.length) {
                 window.updateState({ currentStep: newStepIndex });
@@ -803,17 +879,15 @@
             const isUlasanStep = flowSteps[currentStepIndex].id === 'ulasan';
             const isResultStep = flowSteps[currentStepIndex].id === 'result';
             const nextButtonText = isUlasanStep ? 'Hantar Penilaian' : 'Seterusnya';
+            const clientName = window.appState.answers.nama_perniagaan || 'Klien eHalalGAP';
 
-            const introductionHtml = ``; // REMOVED
+            const introductionHtml = `<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full"><div class="mb-8 p-6 bg-white rounded-xl shadow-lg"><h2 class="text-2xl font-bold text-gray-800 mb-2">Selamat Datang, ${clientName}!</h2><p class="text-base leading-relaxed text-gray-600">Papan pemuka ini direka untuk membantu anda menjejaki ketersediaan halal, menggambarkan kemajuan, dan menguruskan tindakan penambahbaikan di satu tempat.</p></div></div>`;
             appContainer.innerHTML = `<div class="min-h-screen bg-gray-50 flex flex-col"><header class="hero-bg py-4 px-4 shadow-lg"><div class="max-w-6xl mx-auto text-white flex justify-between items-center"><div><h1 class="text-xl sm:text-2xl font-extrabold">Semakan Jurang Halal (eHalalGAP)</h1><p class="mt-1 text-sm text-gray-200">Analisis Kendiri untuk Pensijilan Halal</p></div><button onclick="window.logoutClient()" class="bg-red-500 text-white hover:bg-red-600 px-4 py-2 rounded-lg text-sm font-semibold flex items-center"><svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>Log Keluar</button></div></header><main class="flex-grow max-w-6xl mx-auto py-8 w-full">${introductionHtml}<div class="px-4 sm:px-6 lg:px-8" id="main-content-start">${window.renderProgress(score)}<nav class="flex overflow-x-auto whitespace-nowrap space-x-2 sm:space-x-4 mb-8 p-1 bg-white rounded-xl shadow-md" id="tab-nav-container">${flowSteps.map((step, index) => {
                 const isResultTab = step.id === 'result';
                 const isCompleted = window.appState.assessmentCompleted;
                 let tabClasses = 'py-3 px-3 sm:px-4 text-sm font-medium transition rounded-lg';
-                if (isResultTab && !isCompleted) {
-                    tabClasses += ' cursor-not-allowed text-gray-400 bg-gray-50';
-                } else {
-                    tabClasses += ` cursor-pointer ${index === currentStepIndex ? 'tab-active bg-teal-50' : 'text-gray-600 hover:bg-gray-100'}`;
-                }
+                if (isResultTab && !isCompleted) tabClasses += ' cursor-not-allowed text-gray-400 bg-gray-50';
+                else tabClasses += ` cursor-pointer ${index === currentStepIndex ? 'tab-active bg-teal-50' : 'text-gray-600 hover:bg-gray-100'}`;
                 return `<button onclick="window.goToStep(${index})" class="${tabClasses}">${step.title.replace(/^\d+\.\s*/, '')}</button>`;
             }).join('')}</nav><div class="p-6 bg-white rounded-xl shadow-2xl border-t-4 border-teal-500">${window.renderTabContent()}</div><div class="mt-8 flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-4 sm:space-y-0"><button onclick="window.changeStep(-1)" ${currentStepIndex === 0 ? 'disabled' : ''} class="w-full sm:w-auto btn-secondary px-6 py-3 rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center"><svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>Sebelumnya</button><div class="flex flex-col items-center space-y-2 w-full sm:w-auto"><button onclick="window.manualSave()" ${isResultStep ? 'disabled' : ''} id="save-progress-btn" class="w-full sm:w-auto inline-flex items-center justify-center btn-secondary px-6 py-3 rounded-xl font-semibold hover:bg-teal-100 text-teal-700 disabled:opacity-50"><svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>Simpan Kemajuan</button><p id="save-status-message" class="text-xs text-gray-500 opacity-0 transition"></p></div><button onclick="window.changeStep(1)" ${isResultStep ? 'disabled' : ''} class="w-full sm:w-auto btn-primary px-6 py-3 rounded-xl text-white font-semibold disabled:opacity-50 flex items-center justify-center">${nextButtonText}<svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg></button></div></div></main><footer class="bg-gray-800 text-white p-4 mt-8"><div class="max-w-6xl mx-auto text-center text-sm"><p>&copy; Hak Cipta ACE UniKL MICET 2025.</p></div></footer></div><div id="report-modal" class="modal"><div class="modal-content"><div class="sticky top-0 bg-white border-b p-4 flex justify-between items-center rounded-t-xl z-10 print-hidden"><h2 class="text-2xl font-bold">Preview Laporan Penuh</h2><button onclick="window.toggleModal(false)" class="text-gray-500 hover:text-gray-800"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button></div><div id="modal-report-body"></div><div class="sticky bottom-0 bg-gray-50 border-t p-4 flex justify-center rounded-b-xl z-10 space-x-4 print-hidden"><button onclick="window.toggleModal(false)" class="btn-secondary px-6 py-3 rounded-xl font-semibold">Tutup</button><button onclick="window.downloadReportPDF()" class="btn-primary px-6 py-3 rounded-xl text-white font-semibold">Muat Turun PDF</button></div></div></div>`;
         };
@@ -828,4 +902,6 @@
     </div>
 </body>
 </html>
+
+
 
