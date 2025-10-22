@@ -469,7 +469,7 @@ Sila mulakan rumusan anda.
                 `.trim();
 
                 const apiKey = ""; 
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
                 const payload = { contents: [{ parts: [{ text: userQuery }] }] };
                 
                 const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -881,7 +881,7 @@ Sila mulakan rumusan anda.
             const nextButtonText = isUlasanStep ? 'Hantar Penilaian' : 'Seterusnya';
             const clientName = window.appState.answers.nama_perniagaan || 'Klien eHalalGAP';
 
-            const introductionHtml = `<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full"><div class="mb-8 p-6 bg-white rounded-xl shadow-lg"><h2 class="text-2xl font-bold text-gray-800 mb-2">Selamat Datang, ${clientName}!</h2><p class="text-base leading-relaxed text-gray-600">Dashboard ini direka untuk membantu anda menjejaki ketersediaan halal, menggambarkan kemajuan, dan menguruskan tindakan penambahbaikan di satu tempat.</p></div></div>`;
+            const introductionHtml = `<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full"><div class="mb-8 p-6 bg-white rounded-xl shadow-lg"><h2 class="text-2xl font-bold text-gray-800 mb-2">Selamat Datang, ${clientName}!</h2><p class="text-base leading-relaxed text-gray-600">Papan pemuka ini direka untuk membantu anda menjejaki ketersediaan halal, menggambarkan kemajuan, dan menguruskan tindakan penambahbaikan di satu tempat.</p></div></div>`;
             appContainer.innerHTML = `<div class="min-h-screen bg-gray-50 flex flex-col"><header class="hero-bg py-4 px-4 shadow-lg"><div class="max-w-6xl mx-auto text-white flex justify-between items-center"><div><h1 class="text-xl sm:text-2xl font-extrabold">Semakan Jurang Halal (eHalalGAP)</h1><p class="mt-1 text-sm text-gray-200">Analisis Kendiri untuk Pensijilan Halal</p></div><button onclick="window.logoutClient()" class="bg-red-500 text-white hover:bg-red-600 px-4 py-2 rounded-lg text-sm font-semibold flex items-center"><svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>Log Keluar</button></div></header><main class="flex-grow max-w-6xl mx-auto py-8 w-full">${introductionHtml}<div class="px-4 sm:px-6 lg:px-8" id="main-content-start">${window.renderProgress(score)}<nav class="flex overflow-x-auto whitespace-nowrap space-x-2 sm:space-x-4 mb-8 p-1 bg-white rounded-xl shadow-md" id="tab-nav-container">${flowSteps.map((step, index) => {
                 const isResultTab = step.id === 'result';
                 const isCompleted = window.appState.assessmentCompleted;
@@ -902,4 +902,6 @@ Sila mulakan rumusan anda.
     </div>
 </body>
 </html>
+
+
 
