@@ -39,6 +39,8 @@
         import { getAuth, onAuthStateChanged, signOut, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, onSnapshot, collection, query, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // --- KONFIGURASI FIREBASE ---
+        // (Sila gantikan dengan konfigurasi anda sendiri jika perlu)
         const APP_FIREBASE_CONFIG = {
             apiKey: "AIzaSyCll1mrRqrAMAUqzdGqSYSyFBiOpb6y_y4",
             authDomain: "ehalalgap.firebaseapp.com",
@@ -178,6 +180,7 @@
                 </div>`;
         };
         
+        // --- DIUBAH SUAI: Menambah ID pada setiap bahagian untuk PDF ---
         const renderReportContent = (client, answers, score) => {
             const progress = score.readinessScore;
             let status, statusColor, recommendation;
@@ -192,29 +195,29 @@
             return `
                 <div id="pdf-content-container" class="bg-white p-8">
                     <!-- Section 1: Header & Summary -->
-                    <div class="text-center pb-4 border-b">
+                    <div id="pdf-sec-header" class="text-center pb-4 border-b">
                         <h2 class="text-3xl font-extrabold text-gray-800">eHalal<span class="text-teal-600">GAP</span></h2>
                         <h1 class="text-2xl font-bold text-gray-700 mt-2">Laporan Semakan Jurang Halal</h1>
                         <p class="text-lg text-gray-500 mt-1">${client.clientName || 'Tidak Dinamakan'}</p>
                     </div>
-                    <div class="mt-8 p-6 rounded-xl shadow-lg border"><h3 class="text-2xl font-bold mb-4 text-center">Ringkasan Keputusan</h3><div class="flex flex-col sm:flex-row items-center justify-around text-center"><div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl mt-1">Ketersediaan</p></div><div><p class="text-5xl font-extrabold">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl mt-1">Mata Halal</p></div></div></div>
-                    <div class="mt-8 text-center p-6 rounded-xl border-4 ${statusColor} shadow-md"><p class="text-2xl font-bold">Status: <span class="text-3xl">${status.toUpperCase()}</span></p><p class="mt-4">${recommendation}</p></div>
+                    <div id="pdf-sec-ringkasan" class="mt-8 p-6 rounded-xl shadow-lg border"><h3 class="text-2xl font-bold mb-4 text-center">Ringkasan Keputusan</h3><div class="flex flex-col sm:flex-row items-center justify-around text-center"><div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl mt-1">Ketersediaan</p></div><div><p class="text-5xl font-extrabold">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl mt-1">Mata Halal</p></div></div></div>
+                    <div id="pdf-sec-status" class="mt-8 text-center p-6 rounded-xl border-4 ${statusColor} shadow-md"><p class="text-2xl font-bold">Status: <span class="text-3xl">${status.toUpperCase()}</span></p><p class="mt-4">${recommendation}</p></div>
 
                     <!-- Section 2: Business Info -->
-                    <div class="mt-8 p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Maklumat Perniagaan</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-bold">${['Nama Perniagaan','No SSM (jika ada)','Alamat','No Telefon','Nama Pemilik','Jualan tahunan perniagaan','Bilangan pekerja keseluruhan'].map(f => `<p><strong>${f}:</strong> ${answers[f.toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_')] || '- '}</p>`).join('')}</div></div>
-                    ${clientReview ? `<div class="mt-8 p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Ulasan Klien</h4><p class="text-sm whitespace-pre-wrap">${clientReview}</p></div>` : ''}
+                    <div id="pdf-sec-maklumat" class="mt-8 p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Maklumat Perniagaan</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-bold">${['Nama Perniagaan','No SSM (jika ada)','Alamat','No Telefon','Nama Pemilik','Jualan tahunan perniagaan','Bilangan pekerja keseluruhan'].map(f => `<p><strong>${f}:</strong> ${answers[f.toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_')] || '- '}</p>`).join('')}</div></div>
+                    ${clientReview ? `<div id="pdf-sec-ulasan" class="mt-8 p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Ulasan Klien</h4><p class="text-sm whitespace-pre-wrap">${clientReview}</p></div>` : ''}
 
                     <!-- Section 3: Pie Chart -->
-                    <div class="mt-8 p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Jawapan</h4><div class="flex justify-center w-full max-w-lg mx-auto"><canvas id="modalReportPieChart" width="400" height="400"></canvas></div></div>
+                    <div id="pdf-sec-piechart" class="mt-8 p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Jawapan</h4><div class="flex justify-center w-full max-w-lg mx-auto"><canvas id="modalReportPieChart" width="400" height="400"></canvas></div></div>
 
                     <!-- Section 4: Gaps Table -->
-                    <div class="mt-8 p-6 bg-white rounded-xl shadow-lg border-t-4 border-red-500"><h4 class="text-xl font-bold text-red-700 mb-4 border-b pb-2">Jurang Pematuhan Kritikal</h4>${renderGapsTable(answers, scoredSections)}</div>
+                    <div id="pdf-sec-jurang" class="mt-8 p-6 bg-white rounded-xl shadow-lg border-t-4 border-red-500"><h4 class="text-xl font-bold text-red-700 mb-4 border-b pb-2">Jurang Pematuhan Kritikal</h4>${renderGapsTable(answers, scoredSections)}</div>
 
                     <!-- Section 5: Section Analysis -->
-                    <div class="mt-8 p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Mengikut Bahagian</h4>${scoredSections.map(sId => { const qs = (sId === 'syarat') ? flowSteps.find(s=>s.id===sId).questions : qaQuestions[sId]; const pts = questionPoints[sId] || []; let secMax=0, secScore=0; pts.forEach(p=>{secMax+=p;}); qs.forEach((q,idx) => { const ans = answers[`${sId}_${idx}`]; let isReady= (ans==='YA'); if(sId==='bahan'&& idx===3) isReady=(ans==='TIDAK'); if(isReady) secScore+=pts[idx]; }); const secPerc = secMax > 0 ? (secScore / secMax) * 100 : 0; const secTitle = flowSteps.find(s=>s.id===sId)?.title.replace(/^\d+\.\s*/, '') || sId; const barColor = secPerc >= 80 ? 'bg-green-500' : secPerc >= 60 ? 'bg-yellow-500' : 'bg-red-500'; return `<div class="mb-6 border-b pb-4"><h5 class="text-lg font-bold">${secTitle}</h5><div class="flex justify-between items-center mb-1"><span class="text-sm">Skor: ${secScore}/${secMax}</span><span class="text-lg font-bold">${secPerc.toFixed(0)}%</span></div><div class="w-full bg-gray-200 rounded-full h-3"><div class="${barColor} h-3 rounded-full" style="width: ${secPerc.toFixed(0)}%"></div></div></div>`; }).join('')}</div>
+                    <div id="pdf-sec-bahagian" class="mt-8 p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Mengikut Bahagian</h4>${scoredSections.map(sId => { const qs = (sId === 'syarat') ? flowSteps.find(s=>s.id===sId).questions : qaQuestions[sId]; const pts = questionPoints[sId] || []; let secMax=0, secScore=0; pts.forEach(p=>{secMax+=p;}); qs.forEach((q,idx) => { const ans = answers[`${sId}_${idx}`]; let isReady= (ans==='YA'); if(sId==='bahan'&& idx===3) isReady=(ans==='TIDAK'); if(isReady) secScore+=pts[idx]; }); const secPerc = secMax > 0 ? (secScore / secMax) * 100 : 0; const secTitle = flowSteps.find(s=>s.id===sId)?.title.replace(/^\d+\.\s*/, '') || sId; const barColor = secPerc >= 80 ? 'bg-green-500' : secPerc >= 60 ? 'bg-yellow-500' : 'bg-red-500'; return `<div class="mb-6 border-b pb-4"><h5 class="text-lg font-bold">${secTitle}</h5><div class="flex justify-between items-center mb-1"><span class="text-sm">Skor: ${secScore}/${secMax}</span><span class="text-lg font-bold">${secPerc.toFixed(0)}%</span></div><div class="w-full bg-gray-200 rounded-full h-3"><div class="${barColor} h-3 rounded-full" style="width: ${secPerc.toFixed(0)}%"></div></div></div>`; }).join('')}</div>
                     
                     <!-- Footer -->
-                    <div class="mt-8 text-xs text-gray-500 text-center pt-4 border-t">&copy; Hak Cipta ACE UniKL MICET 2025.</div>
+                    <div id="pdf-sec-footer" class="mt-8 text-xs text-gray-500 text-center pt-4 border-t">&copy; Hak Cipta ACE UniKL MICET 2025.</div>
                 </div>`;
         };
 
@@ -235,7 +238,8 @@
                     <h2 class="text-4xl font-bold text-gray-700">Laporan Semakan Jurang Halal</h2>
                     <div class="mt-12 border-t-2 border-teal-500 w-24 mx-auto"></div>
                     <p class="mt-8 text-3xl font-semibold">${answers.nama_perniagaan || 'Nama Perniagaan'}</p>
-                    <p class="mt-2 text-lg text-gray-600">${answers.no_ssm__jika_ada_ || 'No. Pendaftaran'}</p>
+                    <!-- Baris berikut dialih keluar seperti yang diminta -->
+                    <!-- <p class="mt-2 text-lg text-gray-600">${answers.no_ssm__jika_ada_ || 'No. Pendaftaran'}</p> -->
                 </div>
                 
                 <div class="text-sm text-gray-600">
@@ -264,6 +268,7 @@
             `;
         };
 
+        // --- DIUBAH SUAI: Fungsi muat turun PDF untuk menyusun halaman ---
         window.downloadReportPDF = async () => {
             if (!selectedClientData) {
                 alert("Sila pilih dan lihat laporan klien terlebih dahulu sebelum memuat turun.");
@@ -280,6 +285,7 @@
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = pdf.internal.pageSize.getHeight();
             const margin = 10;
+            const contentWidth = pdfWidth - (margin * 2);
             
             // --- 1. Add Cover Page ---
             const tempCoverContainer = document.createElement('div');
@@ -295,40 +301,111 @@
             document.body.removeChild(tempCoverContainer);
 
             // --- 2. Add Main Report Content ---
-            pdf.addPage();
-            let yPos = margin;
-            
             const reportElement = document.getElementById('modal-report-body');
-            // The content is already rendered by viewReport, so we just need to re-render the chart without animation
             const { answers, score } = selectedClientData;
+            
+            // Pastikan carta pai dilukis tanpa animasi untuk ditangkap oleh html2canvas
              if (score.totalAnswered > 0) {
                 const originalAnimation = Chart.defaults.animation;
                 Chart.defaults.animation = false;
                 await new Promise(resolve => renderPieChart(score.answerBreakdown, 'modalReportPieChart', resolve));
                 Chart.defaults.animation = originalAnimation;
             }
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => setTimeout(r, 500)); // Beri masa untuk render
 
-            const addCanvasToPdf = async (element) => {
-                const canvas = await html2canvas(element, { scale: 2, useCORS: true });
-                const imgData = canvas.toDataURL('image/jpeg', 0.98);
-                const imgWidth = pdfWidth - (margin * 2);
-                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            // Fungsi bantuan untuk mengambil elemen, klon, dan tambah ke halaman PDF
+            const addElementsToPage = async (elementIds) => {
+                pdf.addPage();
+                let yPos = margin;
+                
+                // Cipta bekas sementara untuk memegang elemen yang diklon
+                const tempContainer = document.createElement('div');
+                tempContainer.style.position = 'absolute';
+                tempContainer.style.left = '-9999px';
+                // Tetapkan lebar agar sepadan dengan bekas kandungan asal untuk mengekalkan susun atur
+                tempContainer.style.width = reportElement.querySelector('#pdf-content-container').clientWidth + 'px';
+                tempContainer.style.backgroundColor = 'white'; // Pastikan latar belakang putih
+                tempContainer.style.padding = '32px'; // Padankan p-8 pada #pdf-content-container
+                
+                for (const id of elementIds) {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        const elClone = el.cloneNode(true);
 
-                if (yPos + imgHeight + margin > pdfHeight) {
-                    pdf.addPage();
-                    yPos = margin;
+                        // --- TAMBAHAN BARU: Tukar Kanvas Carta Pai kepada Imej ---
+                        // Ini diperlukan kerana html2canvas tidak dapat menangkap kanvas yang diklon
+                        if (id === 'pdf-sec-piechart') {
+                            // Cari kanvas yang diklon DI DALAM elClone
+                            const clonedCanvas = elClone.querySelector('#modalReportPieChart');
+                            if (clonedCanvas) {
+                                // Dapatkan kanvas asal dari modal
+                                const originalCanvas = document.getElementById('modalReportPieChart');
+                                if (originalCanvas) {
+                                    // Dapatkan data imej dari kanvas ASAL
+                                    const imgData = originalCanvas.toDataURL('image/png');
+                                    
+                                    // Cipta elemen imej baru
+                                    const img = document.createElement('img');
+                                    img.src = imgData;
+                                    
+                                    // Salin gaya untuk memastikan saiz konsisten
+                                    img.style.width = '100%';
+                                    img.style.height = 'auto';
+                                    img.style.maxWidth = '400px'; // Padankan saiz asal
+                                    img.style.margin = '0 auto'; // Pusatkan
+                                    img.style.display = 'block';
+                                    
+                                    // Gantikan <canvas> yang diklon (kosong) dengan <img> (penuh)
+                                    clonedCanvas.parentNode.replaceChild(img, clonedCanvas);
+                                }
+                            }
+                        }
+                        // --- AKHIR TAMBAHAN ---
+
+                        tempContainer.appendChild(elClone);
+                    }
                 }
+                document.body.appendChild(tempContainer);
 
-                pdf.addImage(imgData, 'JPEG', margin, yPos, imgWidth, imgHeight);
-                yPos += imgHeight + 5;
+                // Ambil gambar bekas sementara
+                const canvas = await html2canvas(tempContainer, { 
+                    scale: 2, 
+                    useCORS: true, 
+                    backgroundColor: '#ffffff' 
+                });
+                document.body.removeChild(tempContainer); // Bersihkan
+                
+                const imgData = canvas.toDataURL('image/jpeg', 0.98);
+                const imgHeight = (canvas.height * contentWidth) / canvas.width;
+                
+                let pageHeight = imgHeight;
+                
+                // Jika kandungan lebih tinggi daripada halaman, pangkas ia (untuk kes mudah)
+                // Pilihan yang lebih baik mungkin untuk memuatkan ke halaman
+                if (imgHeight > (pdfHeight - (margin * 2))) {
+                    pageHeight = pdfHeight - (margin * 2);
+                     pdf.addImage(imgData, 'JPEG', margin, yPos, contentWidth, pageHeight, undefined, 'FAST');
+                } else {
+                     pdf.addImage(imgData, 'JPEG', margin, yPos, contentWidth, imgHeight, undefined, 'FAST');
+                }
             };
+            
+            // --- Halaman 1 (Laporan): Ringkasan & Maklumat ---
+            const page1Ids = ['pdf-sec-header', 'pdf-sec-ringkasan', 'pdf-sec-status', 'pdf-sec-maklumat'];
+            const ulasanEl = document.getElementById('pdf-sec-ulasan');
+            if (ulasanEl) page1Ids.push('pdf-sec-ulasan'); // Tambah ulasan jika wujud
+            await addElementsToPage(page1Ids);
+            
+            // --- Halaman 2 (Laporan): Analisis Jawapan (Carta Pai) ---
+            await addElementsToPage(['pdf-sec-piechart']);
+            
+            // --- Halaman 3 (Laporan): Jurang Pematuhan Kritikal ---
+            await addElementsToPage(['pdf-sec-jurang']);
+            
+            // --- Halaman 4 (Laporan): Analisis Mengikut Bahagian & Footer ---
+            await addElementsToPage(['pdf-sec-bahagian', 'pdf-sec-footer']);
 
-            const sections = reportElement.querySelectorAll('#pdf-content-container > div');
-            for (const section of sections) {
-                await addCanvasToPdf(section);
-            }
-
+            // --- Simpan PDF ---
             const clientName = answers['nama_perniagaan'] || 'laporan-ehalalgap';
             const filename = `${clientName.replace(/\s+/g, '_').toLowerCase()}_${new Date().toISOString().slice(0,10)}.pdf`;
             pdf.save(filename);
@@ -343,20 +420,51 @@
             toggleModal(true);
 
             try {
-                const docRef = doc(db, `/artifacts/${appId}/users/${userId}/halal_readiness_assessment/data`);
-                const docSnap = await getDoc(docRef);
-                if (!docSnap.exists()) throw new Error("Dokumen data terperinci klien tidak ditemui.");
-                const answers = docSnap.data().answers || {};
+                // (Nota Pembangun: Laluan ini mungkin memerlukan pelarasan Security Rules)
+                // Cuba dapatkan data terperinci dahulu
+                let answers;
+                try {
+                    const docRef = doc(db, `/artifacts/${appId}/users/${userId}/halal_readiness_assessment/data`);
+                    const docSnap = await getDoc(docRef);
+                    if (docSnap.exists()) {
+                        answers = docSnap.data().answers || {};
+                    } else {
+                        throw new Error("Dokumen data terperinci klien tidak ditemui.");
+                    }
+                } catch (dataError) {
+                     // Jika gagal (cth: kebenaran dinafikan), cuba dapatkan dari data awam sebagai sandaran
+                    console.warn("Gagal mendapatkan data terperinci, cuba data awam...", dataError.message);
+                    const clientSummaryRef = doc(db, `/artifacts/${appId}/public/data/clients/${userId}`);
+                    const clientSummarySnap = await getDoc(clientSummaryRef);
+                    if (clientSummarySnap.exists() && clientSummarySnap.data().answers) {
+                        answers = clientSummarySnap.data().answers;
+                         reportBody.innerHTML = '<p class="text-center p-4 bg-yellow-100 text-yellow-800">Amaran: Gagal memuatkan data terperinci. Menjana laporan berdasarkan data ringkasan. Maklumat mungkin tidak lengkap.</p>' + reportBody.innerHTML;
+                    } else {
+                         throw new Error("Tiada data (terperinci atau awam) ditemui untuk klien ini.");
+                    }
+                }
 
+                // Dapatkan data ringkasan klien
                 const clientSummaryRef = doc(db, `/artifacts/${appId}/public/data/clients/${userId}`);
                 const clientSummarySnap = await getDoc(clientSummaryRef);
                 if (!clientSummarySnap.exists()) throw new Error("Dokumen ringkasan klien tidak ditemui.");
                 const client = clientSummarySnap.data();
+                
+                // Jika 'answers' masih tiada pada data klien, gunakan yang kita dapat tadi
+                if (!client.answers) {
+                    client.answers = answers;
+                }
 
                 const score = calculateScore(answers);
                 selectedClientData = { client, answers, score };
                 
-                reportBody.innerHTML = renderReportContent(client, answers, score);
+                // Render laporan
+                const reportContent = renderReportContent(client, answers, score);
+                
+                // Tambah pada badan modal
+                const currentContent = reportBody.innerHTML.startsWith('<p class="text-center p-8">') ? '' : reportBody.innerHTML;
+                reportBody.innerHTML = currentContent + reportContent;
+
 
                 setTimeout(() => renderPieChart(score.answerBreakdown, 'modalReportPieChart'), 100);
 
@@ -366,8 +474,8 @@
                 if (error.code === 'permission-denied' || error.message.includes("Missing or insufficient permissions")) {
                     detailedErrorMessage += `<br><br><div class='mt-4 p-4 bg-orange-100 border-l-4 border-orange-500 text-orange-700 text-left text-sm'>
                         <p class='font-bold'>Nota Pembangun:</p>
-                        <p class='mt-2'>Ralat ini berlaku kerana <b>Peraturan Keselamatan (Security Rules) Firebase</b> tidak membenarkan akaun konsultan membaca data peribadi klien.</p>
-                        <p class='mt-2'>Untuk membetulkannya, sila pergi ke papan pemuka Firebase anda (Firestore Database -> Rules) dan pastikan peraturan untuk laluan data klien membenarkan akses baca untuk akaun konsultan yang telah disahkan.</p>
+                        <p class='mt-2'>Ralat ini mungkin berlaku kerana <b>Peraturan Keselamatan (Security Rules) Firebase</b> tidak membenarkan akaun konsultan membaca data peribadi klien (cth: dari laluan <code>/artifacts/{appId}/users/{userId}/...</code>).</p>
+                        <p class='mt-2'>Sistem ini cuba menggunakan data ringkasan dari <code>/artifacts/{appId}/public/data/clients/{userId}</code> sebagai sandaran, tetapi pastikan peraturan anda membenarkan sekurang-kurangnya bacaan itu.</p>
                         </div>`;
                 }
                 reportBody.innerHTML = `<div class="p-8 text-red-600 text-center">${detailedErrorMessage}</div>`;
@@ -488,14 +596,26 @@
             db = getFirestore(app);
             auth = getAuth(app);
             
-            const consultantUIDs = ["7XtS5IWBTpgKryjAvONtXALd8R03", "A2nVUfDEVkhQPyTf8tUkCoXmQeJ3"];
+            // --- SENARAI UID KONSULTAN YANG DIBENARKAN ---
+            // (Tambah UID konsultan anda di sini)
+            const consultantUIDs = [
+                "7XtS5IWBTpgKryjAvONtXALd8R03", // UID untuk a@b.com
+                "A2nVUfDEVkhQPyTf8tUkCoXmQeJ3"  // UID untuk admin@ehalal.com
+                // "UID_KONSULTAN_LAIN_DI_SINI"
+            ];
 
             onAuthStateChanged(auth, (user) => {
                 if (user && consultantUIDs.includes(user.uid)) {
+                    console.log("Akses konsultan dibenarkan untuk:", user.email);
                     showDashboard();
                     loadClients();
                 } else {
-                    if(user) { signOut(auth); }
+                    if(user) { 
+                        console.log("Akses ditolak untuk:", user.email, "Bukan UID konsultan.");
+                        signOut(auth); 
+                    } else {
+                        console.log("Tiada pengguna log masuk.");
+                    }
                     showLogin();
                 }
             });
@@ -515,11 +635,17 @@
 
             onSnapshot(q, (snapshot) => {
                 allClients = snapshot.docs.map(doc => doc.data());
+                // Isih klien mengikut tarikh kemas kini terakhir (terbaru dahulu)
+                allClients.sort((a, b) => b.lastUpdated - a.lastUpdated);
                 renderClientList(); 
             }, (error) => {
                 console.error("Gagal memuatkan senarai klien: ", error);
                 if(tableBody) {
-                    tableBody.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-red-600">Ralat memuatkan data klien.</td></tr>';
+                    let errorMsg = 'Ralat memuatkan data klien.';
+                    if (error.code === 'permission-denied') {
+                        errorMsg = "Ralat Kebenaran: Akaun anda tidak mempunyai kebenaran untuk membaca senarai klien. Sila semak Peraturan Keselamatan (Security Rules) Firestore anda.";
+                    }
+                    tableBody.innerHTML = `<tr><td colspan="6" class="text-center p-4 text-red-600">${errorMsg}</td></tr>`;
                 }
             });
         }
@@ -605,7 +731,8 @@
                 <h2 class="text-2xl font-bold text-gray-800">Laporan Penuh Klien</h2>
                 <button onclick="window.toggleModal(false)" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
             </div>
-            <div id="modal-report-body"></div>
+            <!-- Badan modal ini akan diisi oleh renderReportContent -->
+            <div id="modal-report-body" class="overflow-y-auto"></div>
             <div class="sticky bottom-0 bg-gray-50 border-t p-4 flex justify-center space-x-4 rounded-b-xl z-10">
                 <button onclick="window.toggleModal(false)" class="btn-secondary px-6 py-2 rounded-xl">Tutup</button>
                 <button onclick="window.downloadReportPDF()" class="btn-primary text-white px-6 py-2 rounded-xl">Muat Turun PDF</button>
@@ -614,4 +741,5 @@
     </div>
 </body>
 </html>
+
 
