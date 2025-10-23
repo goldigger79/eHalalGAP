@@ -592,13 +592,13 @@ Sila mulakan rumusan anda.
             }
         };
 
-        window.renderReportCover = () => {
+        window.renderReportCover = (pageWidth, pageHeight) => {
             const answers = window.appState.answers;
             const today = new Date();
             const formattedDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
             
             return `
-            <div id="pdf-cover-page" class="bg-white p-8" style="width: 210mm; height: 297mm; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #eee;">
+            <div id="pdf-cover-page" class="bg-white p-8" style="width: ${pageWidth}mm; height: ${pageHeight}mm; display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #eee;">
                 <div><h1 class="text-5xl font-extrabold text-gray-800">eHalal<span class="text-teal-600">GAP</span></h1><p class="text-lg text-gray-500 mt-2">Platform Analisis Kendiri untuk Pensijilan Halal</p></div>
                 <div class="text-center"><h2 class="text-4xl font-bold text-gray-700">Laporan Semakan Jurang Halal</h2><div class="mt-12 border-t-2 border-teal-500 w-24 mx-auto"></div><p class="mt-8 text-3xl font-semibold">${answers.nama_perniagaan || 'Nama Perniagaan'}</p>${answers.no_ssm_jika_ada_ ? `<p class="mt-2 text-lg text-gray-600">${answers.no_ssm_jika_ada_}</p>` : ''}</div>
                 <div class="text-sm text-gray-600"><div class="grid grid-cols-2 gap-4"><div><p class="font-bold">Disediakan Untuk:</p><p>${answers.nama_pemilik || answers.nama_perniagaan}</p></div><div><p class="font-bold">Tarikh Laporan:</p><p>${formattedDate}</p></div><div><p class="font-bold">Disediakan Oleh:</p><p>Sistem Automasi eHalalGAP</p></div><div><p class="font-bold">ID Laporan:</p><p>EHG-${today.getTime()}</p></div></div><p class="mt-8 text-xs text-gray-500 italic">Dokumen ini adalah sulit dan mengandungi maklumat proprietari. Ia dihasilkan untuk kegunaan dalaman penerima sahaja dan tidak boleh disebarkan tanpa kebenaran bertulis.</p><p class="text-center mt-4 text-xs">&copy; Hak Cipta ACE UniKL MICET ${new Date().getFullYear()}.</p></div>
@@ -612,21 +612,35 @@ Sila mulakan rumusan anda.
             downloadButton.disabled = true;
 
             const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF('p', 'mm', 'a4');
+            // --- MODIFICATION: Use a narrow, mobile-friendly page width ---
+            const mobilePageWidth = 120; // 120mm width
+            const pdf = new jsPDF({ unit: 'mm', format: [mobilePageWidth, 297] });
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = pdf.internal.pageSize.getHeight();
+            
+            // --- MODIFICATION: Define margins for paginated content ---
+            const topMargin = 15;
+            const bottomMargin = 15;
+            const leftMargin = 10;
+            const rightMargin = 10;
+            const contentWidth = pdfWidth - leftMargin - rightMargin;
+            const pageContentHeight = pdfHeight - topMargin - bottomMargin;
             
             // --- Helper: A4 Page Container (untuk menangkap imej) ---
             const tempCaptureContainer = document.createElement('div');
             tempCaptureContainer.style.position = 'absolute';
             tempCaptureContainer.style.left = '-9999px';
             // Styling Halaman A4
-            const a4PageStyle = `width: 210mm; height: 297mm; padding: 20px; background-color: white; color: black; font-family: 'Inter', sans-serif; display: flex; flex-direction: column; justify-content: space-between;`;
+            // --- MODIFICATION: Use contentWidth and no fixed height for capture container ---
+            const a4PageStyle = `width: ${contentWidth}mm; padding: 0; background-color: white; color: black; font-family: 'Inter', sans-serif; display: flex; flex-direction: column;`;
             tempCaptureContainer.style.cssText += a4PageStyle;
             document.body.appendChild(tempCaptureContainer);
 
-            // --- Helper: Fungsi untuk menangkap 'div' kontena semasa ---
-            const capturePage = async () => {
+            // --- MODIFICATION: Add Pagination Helper ---
+            const addPaginatedPage = async (contentHTML, pageNum) => {
+                // This helper adds HTML content to the PDF, handling pagination.
+                tempCaptureContainer.innerHTML = contentHTML;
+                
                 const canvas = await html2canvas(tempCaptureContainer, {
                     scale: 2,
                     useCORS: true,
@@ -635,12 +649,26 @@ Sila mulakan rumusan anda.
                     windowWidth: tempCaptureContainer.scrollWidth,
                     windowHeight: tempCaptureContainer.scrollHeight
                 });
-                return canvas.toDataURL('image/jpeg', 0.98);
-            };
 
-            // --- Helper: Header & Footer Halaman ---
-            const getPageHeader = () => `<div class="text-center pb-4 border-b"><h2 class="text-3xl font-extrabold text-gray-800">eHalal<span class="text-teal-600">GAP</span></h2><h1 class="text-xl font-bold text-gray-700 mt-1">Laporan Semakan Jurang Halal</h1></div>`;
-            const getPageFooter = (pageNum) => `<div class="mt-auto text-xs text-gray-500 text-center pt-4 border-t"><p class="mb-1">&copy; Hak Cipta ACE UniKL MICET ${new Date().getFullYear()}.</p><p>Muka Surat ${pageNum}</p></div>`;
+                const imgWidth = contentWidth;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                let heightLeft = imgHeight;
+                let position = 0; // Y-position of the image slice
+
+                pdf.setPage(pageNum); // Set to current page
+                pdf.addImage(canvas, 'JPEG', leftMargin, topMargin, imgWidth, imgHeight);
+                heightLeft -= pageContentHeight;
+
+                // Add more pages if content is too tall
+                while (heightLeft > 0) {
+                    position -= pageContentHeight;
+                    pageNum++;
+                    pdf.addPage();
+                    pdf.addImage(canvas, 'JPEG', leftMargin, position + topMargin, imgWidth, imgHeight);
+                    heightLeft -= pageContentHeight;
+                }
+                return pageNum; // Return the last page number used
+            };
 
             // --- Dapatkan Data (disalin dari renderReportContent) ---
             const score = window.calculateScore();
@@ -658,7 +686,7 @@ Sila mulakan rumusan anda.
                 const tempCoverContainer = document.createElement('div');
                 tempCoverContainer.style.position = 'absolute';
                 tempCoverContainer.style.left = '-9999px';
-                tempCoverContainer.innerHTML = window.renderReportCover();
+                tempCoverContainer.innerHTML = window.renderReportCover(pdfWidth, pdfHeight);
                 document.body.appendChild(tempCoverContainer);
                 const coverElement = document.getElementById('pdf-cover-page');
                 
@@ -666,33 +694,26 @@ Sila mulakan rumusan anda.
                 const coverImgData = coverCanvas.toDataURL('image/jpeg', 0.98);
                 pdf.addImage(coverImgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
                 document.body.removeChild(tempCoverContainer);
+                let currentPage = 1;
 
                 // --- 2. Tambah Muka Surat 1: Ringkasan + Maklumat ---
+                currentPage++;
                 pdf.addPage();
                 const page1HTML = `
-                    <div>${getPageHeader()}</div>
-                    <div class="flex-grow"> <!-- flex-grow untuk mengisi ruang -->
-                        <!-- Ringkasan Keputusan -->
-                        <div class="mt-8 p-6 rounded-xl shadow-lg border"><h3 class="text-2xl font-bold mb-4 text-center">Ringkasan Keputusan</h3><div class="flex flex-col sm:flex-row items-center justify-around text-center"><div><p class="text-5xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-xl mt-1">Ketersediaan</p></div><div><p class="text-5xl font-extrabold">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-xl mt-1">Mata Halal</p></div></div></div>
-                        <div class="mt-8 text-center p-6 rounded-xl border-4 ${statusColor} shadow-md"><p class="text-2xl font-bold">Status: <span class="text-3xl">${status.toUpperCase()}</span></p><p class="mt-4">${recommendation}</p></div>
-                        <!-- Maklumat Perniagaan -->
-                        <div class="mt-8 p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Maklumat Perniagaan</h4><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-bold">${['Nama Perniagaan','No SSM (jika ada)','Alamat','No Telefon','Nama Pemilik','Jualan tahunan perniagaan','Bilangan pekerja keseluruhan'].map(f => `<p><strong>${f}:</strong> ${answers[f.toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_')] || '- '}</p>`).join('')}</div></div>
-                        ${clientReview ? `<div class="mt-8 p-6 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-xl font-semibold mb-4 border-b pb-2">Ulasan Klien</h4><p class="text-sm whitespace-pre-wrap">${clientReview}</p></div>` : ''}
-                    </div>
-                    ${getPageFooter(1)}
+                    <!-- Ringkasan Keputusan -->
+                    <div class="p-4 rounded-xl shadow-lg border"><h3 class="text-xl font-bold mb-4 text-center">Ringkasan Keputusan</h3><div class="flex flex-col items-center justify-around text-center space-y-4"><div><p class="text-4xl font-extrabold text-teal-600">${progress.toFixed(0)}%</p><p class="text-lg mt-1">Ketersediaan</p></div><div><p class="text-4xl font-extrabold">${score.totalPointsScored}/${score.totalQuestions}</p><p class="text-lg mt-1">Mata Halal</p></div></div></div>
+                    <div class="mt-6 text-center p-4 rounded-xl border-4 ${statusColor} shadow-md"><p class="text-xl font-bold">Status: <span class="text-2xl">${status.toUpperCase()}</span></p><p class="mt-2">${recommendation}</p></div>
+                    <!-- Maklumat Perniagaan -->
+                    <div class="mt-6 p-4 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-lg font-semibold mb-4 border-b pb-2">Maklumat Perniagaan</h4><div class="grid grid-cols-1 gap-2 text-sm">${['Nama Perniagaan','No SSM (jika ada)','Alamat','No Telefon','Nama Pemilik','Jualan tahunan perniagaan','Bilangan pekerja keseluruhan'].map(f => `<p><strong>${f}:</strong> ${answers[f.toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_')] || '- '}</p>`).join('')}</div></div>
+                    ${clientReview ? `<div class="mt-6 p-4 bg-gray-50 rounded-xl shadow-sm border"><h4 class="text-lg font-semibold mb-4 border-b pb-2">Ulasan Klien</h4><p class="text-sm whitespace-pre-wrap">${clientReview}</p></div>` : ''}
                 `;
-                tempCaptureContainer.innerHTML = page1HTML;
-                let imgData = await capturePage();
-                pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                currentPage = await addPaginatedPage(page1HTML, currentPage);
 
                 // --- 3. Tambah Muka Surat 2: Carta Pai ---
+                currentPage++;
                 pdf.addPage();
                 const page2HTML = `
-                    <div>${getPageHeader()}</div>
-                    <div class="flex-grow flex flex-col justify-center"> <!-- Letak di tengah -->
-                        <div class="p-6 bg-white rounded-xl"><h4 class="text-xl font-semibold mb-6 border-b pb-2 text-center">Analisis Jawapan</h4><div class="flex justify-center w-full max-w-lg mx-auto"><canvas id="pdfReportPieChart" width="400" height="400"></canvas></div></div>
-                    </div>
-                    ${getPageFooter(2)}
+                    <div class="p-4 bg-white rounded-xl"><h4 class="text-lg font-semibold mb-4 border-b pb-2 text-center">Analisis Jawapan</h4><div class="flex justify-center w-full mx-auto"><canvas id="pdfReportPieChart" width="400" height="400"></canvas></div></div>
                 `;
                 tempCaptureContainer.innerHTML = page2HTML;
                 
@@ -704,34 +725,38 @@ Sila mulakan rumusan anda.
                 }
                 await new Promise(r => setTimeout(r, 500)); // Beri masa untuk carta render
                 
-                imgData = await capturePage();
-                pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                currentPage = await addPaginatedPage(tempCaptureContainer.innerHTML, currentPage);
                 
                 // --- 4. Tambah Muka Surat 3: Jadual Jurang (Gaps) ---
+                currentPage++;
                 pdf.addPage();
                 const page3HTML = `
-                    <div>${getPageHeader()}</div>
-                    <div class="flex-grow">
-                        <div class="mt-8 p-6 bg-white rounded-xl shadow-lg border-t-4 border-red-500"><h4 class="text-xl font-bold text-red-700 mb-4 border-b pb-2">Jurang Pematuhan Kritikal</h4>${window.renderGapsTable(answers, scoredSections)}</div>
-                    </div>
-                    ${getPageFooter(3)}
+                    <div class="p-4 bg-white rounded-xl border-t-4 border-red-500"><h4 class="text-lg font-bold text-red-700 mb-4 border-b pb-2">Jurang Pematuhan Kritikal</h4>${window.renderGapsTable(answers, scoredSections)}</div>
                 `;
-                tempCaptureContainer.innerHTML = page3HTML;
-                imgData = await capturePage();
-                pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                currentPage = await addPaginatedPage(page3HTML, currentPage);
 
                 // --- 5. Tambah Muka Surat 4: Analisis Bahagian ---
+                currentPage++;
                 pdf.addPage();
                 const page4HTML = `
-                    <div>${getPageHeader()}</div>
-                    <div class="flex-grow">
-                        <div class="mt-8 p-6 bg-white rounded-xl shadow-lg"><h4 class="text-xl font-semibold mb-6 border-b pb-2">Analisis Mengikut Bahagian</h4>${scoredSections.map(sId => { const qs = (sId === 'syarat') ? flowSteps.find(s=>s.id===sId).questions : qaQuestions[sId]; const pts = questionPoints[sId] || []; let secMax=0, secScore=0; pts.forEach(p=>{secMax+=p;}); qs.forEach((q,idx) => { const ans = answers[`${sId}_${idx}`]; let isReady= (ans==='YA'); if(sId==='bahan'&& idx===3) isReady=(ans==='TIDAK'); if(isReady) secScore+=pts[idx]; }); const secPerc = secMax > 0 ? (secScore / secMax) * 100 : 0; const secTitle = flowSteps.find(s=>s.id===sId)?.title.replace(/^\d+\.\s*/, '') || sId; const barColor = secPerc >= 80 ? 'bg-green-500' : secPerc >= 60 ? 'bg-yellow-500' : 'bg-red-500'; return `<div class="mb-6 border-b pb-4"><h5 class="text-lg font-bold">${secTitle}</h5><div class="flex justify-between items-center mb-1"><span class="text-sm">Skor: ${secScore}/${secMax}</span><span class="text-lg font-bold">${secPerc.toFixed(0)}%</span></div><div class="w-full bg-gray-200 rounded-full h-3"><div class="${barColor} h-3 rounded-full" style="width: ${secPerc.toFixed(0)}%"></div></div></div>`; }).join('')}</div>
-                    </div>
-                    ${getPageFooter(4)}
+                    <div class="p-4 bg-white rounded-xl"><h4 class="text-lg font-semibold mb-4 border-b pb-2">Analisis Mengikut Bahagian</h4>${scoredSections.map(sId => { const qs = (sId === 'syarat') ? flowSteps.find(s=>s.id===sId).questions : qaQuestions[sId]; const pts = questionPoints[sId] || []; let secMax=0, secScore=0; pts.forEach(p=>{secMax+=p;}); qs.forEach((q,idx) => { const ans = answers[`${sId}_${idx}`]; let isReady= (ans==='YA'); if(sId==='bahan'&& idx===3) isReady=(ans==='TIDAK'); if(isReady) secScore+=pts[idx]; }); const secPerc = secMax > 0 ? (secScore / secMax) * 100 : 0; const secTitle = flowSteps.find(s=>s.id===sId)?.title.replace(/^\d+\.\s*/, '') || sId; const barColor = secPerc >= 80 ? 'bg-green-500' : secPerc >= 60 ? 'bg-yellow-500' : 'bg-red-500'; return `<div class="mb-4 border-b pb-3"><h5 class="text-md font-bold">${secTitle}</h5><div class="flex justify-between items-center mb-1"><span class="text-xs">Skor: ${secScore}/${secMax}</span><span class="text-md font-bold">${secPerc.toFixed(0)}%</span></div><div class="w-full bg-gray-200 rounded-full h-2"><div class="${barColor} h-2 rounded-full" style="width: ${secPerc.toFixed(0)}%"></div></div></div>`; }).join('')}</div>
                 `;
-                tempCaptureContainer.innerHTML = page4HTML;
-                imgData = await capturePage();
-                pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                currentPage = await addPaginatedPage(page4HTML, currentPage);
+
+                // --- MODIFICATION: Add headers and footers to all pages ---
+                const totalPages = currentPage;
+                for (let i = 1; i <= totalPages; i++) {
+                    pdf.setPage(i);
+                    if (i > 1) { // No header/footer on cover page
+                        pdf.setFont('helvetica', 'normal');
+                        pdf.setFontSize(8);
+                        pdf.setTextColor('#333');
+                        // Header
+                        pdf.text(`Laporan Ketersediaan Halal - ${answers.nama_perniagaan || 'Klien'}`, leftMargin, 10);
+                        // Footer
+                        pdf.text(`Muka Surat ${i} / ${totalPages}`, pdfWidth - rightMargin, pdfHeight - 10, { align: 'right' });
+                    }
+                }
 
             } catch (error) {
                 console.error("Error generating PDF:", error);
@@ -850,7 +875,7 @@ Sila mulakan rumusan anda.
             tempContainer.style.position = 'absolute';
             tempContainer.style.left = '-9999px';
             // --- MODIFICATION: Use fixed pixel width for html2canvas stability ---
-            tempContainer.style.width = '800px'; 
+            tempContainer.style.width = '400px'; // MODIFICATION: Narrower width for mobile readability
             tempContainer.style.padding = '0';
             tempContainer.style.margin = '0';
             tempContainer.style.backgroundColor = 'white';
@@ -1252,4 +1277,5 @@ Sila mulakan rumusan anda.
     </div>
 </body>
 </html>
+
 
